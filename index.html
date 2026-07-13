@@ -2,904 +2,434 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#378ADD">
-<title>しゃべメモ</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>しゃべメモ β</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap" rel="stylesheet">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap');
+  :root{
+    --bg: #14171a;
+    --surface: #1e2225;
+    --surface-2: #262b2f;
+    --line: #33383c;
+    --text: #f2efe9;
+    --text-dim: #8b9096;
+    --amber: #ffb347;
+    --amber-dim: #7a6438;
+    --orange: #ff5722;
+    --green: #6fcf57;
+    --red: #ff6b6b;
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
+  html,body{ margin:0; padding:0; background:var(--bg); color:var(--text);
+    font-family:'Zen Kaku Gothic New', system-ui, -apple-system, sans-serif; }
+  .mono{ font-family:'JetBrains Mono', ui-monospace, monospace; }
 
-  :root {
-    --bg:        #f0f4f8;
-    --surface:   #ffffff;
-    --surface2:  #e4ecf4;
-    --amber:     #AA8000;
-    --amber-lt:  #d4a800;
-    --amber-dim: #8a6600;
-    --blue:      #378ADD;
-    --text:      #1e2a3a;
-    --text-dim:  #5a6a80;
-    --success:   #2e9e68;
-    --danger:    #cc3333;
-    --radius:    16px;
-    --radius-sm: 10px;
-  }
+  .wrap{ max-width:520px; margin:0 auto; padding:0 0 48px; min-height:100dvh; }
 
-  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  header{ padding:20px 20px 16px; border-bottom:1px solid var(--line);
+    position:sticky; top:0; background:rgba(20,23,26,0.92); backdrop-filter: blur(6px); z-index:20; }
+  header .eyebrow{ font-size:11px; letter-spacing:.14em; color:var(--amber); font-weight:700; }
+  header h1{ margin:4px 0 2px; font-size:22px; font-weight:900; letter-spacing:.01em; }
+  header .sub{ font-size:12px; color:var(--text-dim); }
 
-  body {
-    font-family: 'Noto Sans JP', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100dvh;
-    display: flex;
-    flex-direction: column;
-    overflow-x: hidden;
-  }
+  .support-warn{ margin:14px 20px 0; padding:12px 14px; border:1px solid var(--red);
+    border-radius:4px; background:rgba(255,107,107,0.08); font-size:12.5px; color:var(--red); display:none; }
+  .support-warn.show{ display:block; }
 
-  /* ─── Header ─── */
-  header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 18px 20px 14px;
-    border-bottom: 1px solid var(--surface2);
-  }
-  .logo-mark {
-    width: 36px; height: 36px;
-    background: var(--amber);
-    border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 18px; flex-shrink: 0;
-  }
-  header h1 { font-size: 20px; font-weight: 700; letter-spacing: .04em; }
-  header p  { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+  .device{ margin:18px 20px 0; border:1px solid var(--line); border-radius:6px; overflow:hidden; background:var(--surface); }
+  .device-head{ display:flex; align-items:center; justify-content:space-between; padding:10px 14px;
+    border-bottom:1px solid var(--line); background:var(--surface-2); }
+  .device-head .label{ font-size:10.5px; letter-spacing:.12em; color:var(--text-dim); font-weight:700; }
+  .rec-dot{ width:8px; height:8px; border-radius:50%; background:var(--line); }
+  .rec-dot.live{ background:var(--red); box-shadow:0 0 0 0 rgba(255,107,107,.6); animation: pulse 1.2s infinite; }
+  @keyframes pulse{ 0%{ box-shadow:0 0 0 0 rgba(255,107,107,.55);} 70%{ box-shadow:0 0 0 8px rgba(255,107,107,0);} 100%{ box-shadow:0 0 0 0 rgba(255,107,107,0);} }
 
-  /* ─── Main ─── */
-  main { flex: 1; padding: 20px 16px; display: flex; flex-direction: column; gap: 16px; }
+  .readout{ min-height:64px; padding:16px 14px; font-size:16px; line-height:1.55; color:var(--amber);
+    background:
+      repeating-linear-gradient(transparent, transparent 27px, rgba(255,179,71,0.04) 28px);
+  }
+  .readout .placeholder{ color:var(--amber-dim); }
+  .cursor{ display:inline-block; width:7px; height:16px; background:var(--amber); margin-left:2px;
+    animation: blink 1s steps(1) infinite; vertical-align:-2px; }
+  @keyframes blink{ 50%{ opacity:0; } }
 
-  /* ─── Step card ─── */
-  .step-card {
-    background: var(--surface);
-    border-radius: var(--radius);
-    padding: 20px;
-    border: 1.5px solid var(--surface2);
-    box-shadow: 0 2px 8px rgba(55,138,221,.07);
-    transition: border-color .2s;
-  }
-  .step-card.active  { border-color: var(--amber); }
-  .step-card.done    { border-color: var(--success); opacity: .7; }
-  .step-card.locked  { opacity: .35; pointer-events: none; }
+  .photo-row{ display:flex; gap:10px; padding:14px; border-top:1px solid var(--line); align-items:center; }
+  .photo-thumb{ width:52px; height:52px; border-radius:4px; object-fit:cover; border:1px solid var(--line); flex-shrink:0; background:#000; }
+  .photo-meta{ font-size:11.5px; color:var(--text-dim); }
+  .photo-meta b{ color:var(--text); display:block; font-size:13px; margin-bottom:2px; }
+  .no-photo{ font-size:12px; color:var(--text-dim); padding:14px; border-top:1px solid var(--line); }
 
-  .step-label {
-    font-size: 12px; font-weight: 700; letter-spacing: .12em;
-    color: var(--amber); text-transform: uppercase; margin-bottom: 8px;
-  }
-  .step-card.done .step-label { color: var(--success); }
+  .controls{ display:flex; gap:10px; padding:16px 20px 0; }
+  .btn{ flex:1; border:none; border-radius:6px; padding:16px 10px; font-size:14px; font-weight:700;
+    display:flex; flex-direction:column; align-items:center; gap:6px; cursor:pointer; font-family:inherit;
+    transition: transform .08s ease, opacity .15s ease; }
+  .btn:active{ transform: scale(0.97); }
+  .btn:disabled{ opacity:.35; pointer-events:none; }
+  .btn-icon{ font-size:20px; line-height:1; }
+  .btn-photo{ background:var(--surface-2); color:var(--text); border:1px solid var(--line); }
+  .btn-mic{ background:var(--orange); color:#1a0e08; }
+  .btn-mic.recording{ background:var(--red); color:#fff; }
 
-  .step-title { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
-  .step-desc  { font-size: 14px; color: var(--text-dim); line-height: 1.6; }
+  .parsed{ margin:16px 20px 0; border:1px solid var(--line); border-radius:6px; background:var(--surface); display:none; }
+  .parsed.show{ display:block; }
+  .parsed-head{ padding:10px 14px; font-size:10.5px; letter-spacing:.12em; color:var(--text-dim); font-weight:700;
+    border-bottom:1px solid var(--line); background:var(--surface-2); }
+  .field{ padding:10px 14px; border-bottom:1px solid var(--line); }
+  .field:last-of-type{ border-bottom:none; }
+  .field label{ display:block; font-size:10.5px; color:var(--amber); letter-spacing:.06em; margin-bottom:5px; font-weight:700; }
+  .field input{ width:100%; background:var(--surface-2); border:1px solid var(--line); border-radius:4px;
+    color:var(--text); padding:9px 10px; font-size:14px; font-family:inherit; }
+  .field input:focus{ outline:none; border-color:var(--amber); }
+  .save-row{ display:flex; gap:10px; padding:14px; }
+  .btn-save{ background:var(--green); color:#0e1a08; flex:2; }
+  .btn-retry{ background:var(--surface-2); color:var(--text); border:1px solid var(--line); flex:1; }
 
-  /* ─── Buttons ─── */
-  .btn {
-    display: flex; align-items: center; justify-content: center; gap: 8px;
-    width: 100%; padding: 16px;
-    border: none; border-radius: var(--radius-sm);
-    font-family: inherit; font-size: 17px; font-weight: 700;
-    cursor: pointer; transition: all .15s; margin-top: 14px;
-    letter-spacing: .02em;
-  }
-  .btn-amber  { background: var(--amber);   color: #fff; }
-  .btn-amber:active  { background: var(--amber-dim); transform: scale(.97); }
-  .btn-outline {
-    background: transparent; color: var(--amber);
-    border: 2px solid var(--amber-dim);
-  }
-  .btn-outline:active { background: var(--amber-dim); }
-  .btn-blue   { background: var(--blue);    color: #fff; }
-  .btn-blue:active   { opacity: .8; transform: scale(.97); }
-  .btn-success{ background: var(--success); color: #fff; }
-  .btn-success:active{ opacity: .8; transform: scale(.97); }
-  .btn-danger { background: var(--danger);  color: #fff; }
-  .btn-danger:active { opacity: .8; }
-  .btn-ghost  { background: var(--surface2); color: var(--text-dim); }
+  .section-title{ margin:28px 20px 10px; font-size:11px; letter-spacing:.12em; color:var(--text-dim); font-weight:700;
+    display:flex; justify-content:space-between; align-items:center; }
+  .section-title .count{ color:var(--amber); }
+  .export-link{ font-size:11px; color:var(--amber); text-decoration:none; font-weight:700; letter-spacing:.04em; }
+  .export-link:active{ opacity:.6; }
 
-  .btn-row { display: flex; gap: 10px; margin-top: 14px; }
-  .btn-row .btn { margin-top: 0; }
+  .entry{ margin:0 20px 10px; border:1px solid var(--line); border-radius:6px; background:var(--surface); overflow:hidden; }
+  .entry-top{ display:flex; gap:10px; padding:12px 14px; }
+  .entry-thumb{ width:46px; height:46px; border-radius:4px; object-fit:cover; border:1px solid var(--line); flex-shrink:0; background:#000; }
+  .entry-fields{ flex:1; min-width:0; }
+  .entry-tag{ display:inline-block; font-size:10px; padding:2px 6px; border-radius:3px; margin-right:5px; margin-bottom:4px;
+    background:var(--surface-2); color:var(--amber); border:1px solid var(--line); font-weight:700; }
+  .entry-memo{ font-size:13.5px; line-height:1.5; }
+  .entry-raw{ font-size:11px; color:var(--text-dim); padding:0 14px 12px; border-top:1px dashed var(--line); margin-top:6px; padding-top:8px; }
+  .entry-del{ background:none; border:none; color:var(--text-dim); font-size:11px; padding:8px 14px; width:100%;
+    border-top:1px solid var(--line); cursor:pointer; text-align:center; font-family:inherit; }
 
-  /* ─── Preview image ─── */
-  #preview-wrap {
-    display: none;
-    width: 100%; border-radius: var(--radius-sm);
-    overflow: hidden; margin-top: 12px;
-    position: relative;
-  }
-  #preview-wrap img {
-    width: 100%; max-height: 220px;
-    object-fit: cover; display: block;
-  }
-  #preview-badge {
-    position: absolute; bottom: 8px; left: 8px;
-    background: rgba(0,0,0,.65); backdrop-filter: blur(4px);
-    border-radius: 6px; padding: 4px 8px;
-    font-size: 11px; color: #fff;
-  }
+  .empty{ margin:0 20px; padding:24px; text-align:center; color:var(--text-dim); font-size:12.5px;
+    border:1px dashed var(--line); border-radius:6px; }
 
-  /* ─── Memo area ─── */
-  #memo-area {
-    width: 100%; min-height: 100px;
-    background: var(--surface2); color: var(--text);
-    border: 1.5px solid transparent; border-radius: var(--radius-sm);
-    padding: 14px; font-family: inherit; font-size: 16px; line-height: 1.7;
-    resize: none; margin-top: 12px;
-    transition: border-color .2s;
-  }
-  #memo-area:focus { outline: none; border-color: var(--amber); }
-  #memo-area::placeholder { color: var(--text-dim); }
-
-  /* ─── Voice button ─── */
-  #voice-btn {
-    position: relative; overflow: hidden;
-  }
-  #voice-btn.recording {
-    background: var(--danger);
-    animation: pulse-red 1.2s infinite;
-  }
-  @keyframes pulse-red {
-    0%,100% { box-shadow: 0 0 0 0 rgba(224,85,85,.5); }
-    50%      { box-shadow: 0 0 0 10px rgba(224,85,85,0); }
-  }
-
-  /* ─── GPS status ─── */
-  #gps-status {
-    display: none; margin-top: 12px;
-    background: var(--surface2); border-radius: var(--radius-sm);
-    padding: 12px 16px;
-    font-size: 14px; color: var(--text-dim);
-    display: flex; align-items: center; gap: 8px;
-  }
-  #gps-status.got { color: var(--success); }
-  #gps-status.err { color: var(--danger); }
-  .gps-dot {
-    width: 8px; height: 8px; border-radius: 50%;
-    background: currentColor; flex-shrink: 0;
-  }
-  #gps-status.getting .gps-dot {
-    animation: blink .8s infinite;
-  }
-  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
-
-  /* ─── Toast ─── */
-  #toast {
-    position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(20px);
-    background: var(--surface); color: var(--text);
-    padding: 14px 24px; border-radius: 30px;
-    font-size: 15px; font-weight: 500;
-    opacity: 0; transition: all .25s; pointer-events: none;
-    white-space: nowrap; box-shadow: 0 4px 20px rgba(0,0,0,.15);
-    z-index: 999;
-  }
-  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-  #toast.success { background: var(--success); color: #fff; }
-  #toast.error   { background: var(--danger);  color: #fff; }
-
-  /* ─── Hidden inputs ─── */
-  input[type=file] { display: none; }
-
-  /* ─── Footer ─── */
-  footer {
-    padding: 14px 16px;
-    text-align: center;
-    font-size: 13px; color: var(--text-dim);
-    border-top: 1px solid var(--surface2);
-  }
-
-  /* ─── Mode Select ─── */
-  #mode-select {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    flex: 1;
-    padding: 32px 16px;
-    gap: 20px;
-  }
-  .mode-title {
-    font-size: 20px; font-weight: 700;
-    text-align: center; color: var(--text);
-    line-height: 1.5;
-  }
-  .mode-title span { color: var(--amber); }
-  .mode-cards {
-    display: flex; flex-direction: column;
-    gap: 16px; width: 100%;
-  }
-  .mode-card {
-    background: var(--surface);
-    border: 2px solid var(--surface2);
-    border-radius: var(--radius);
-    padding: 24px 20px;
-    display: flex; align-items: center; gap: 16px;
-    cursor: pointer;
-    transition: all .18s;
-    box-shadow: 0 2px 8px rgba(55,138,221,.07);
-  }
-  .mode-card:active { transform: scale(.97); }
-  .mode-card.camera { border-color: var(--blue); }
-  .mode-card.camera:active { background: #eef5ff; }
-  .mode-card.memo   { border-color: var(--amber); }
-  .mode-card.memo:active { background: #fff8ee; }
-  .mode-icon {
-    font-size: 40px; flex-shrink: 0;
-    width: 60px; text-align: center;
-  }
-  .mode-info { flex: 1; }
-  .mode-name {
-    font-size: 18px; font-weight: 700;
-    margin-bottom: 4px;
-  }
-  .mode-card.camera .mode-name { color: var(--blue); }
-  .mode-card.memo   .mode-name { color: var(--amber); }
-  .mode-sub {
-    font-size: 13px; color: var(--text-dim);
-    line-height: 1.5;
-  }
-  .mode-arrow {
-    font-size: 20px; color: var(--text-dim); flex-shrink: 0;
-  }
-
-  /* ─── Memo entry card ─── */
-  .memo-entry {
-    background: var(--surface2);
-    border-radius: var(--radius-sm);
-    padding: 12px 14px;
-    display: flex; gap: 10px; align-items: flex-start;
-  }
-  .memo-entry-icon { font-size: 18px; flex-shrink: 0; margin-top: 2px; }
-  .memo-entry-body { flex: 1; }
-  .memo-entry-text { font-size: 14px; line-height: 1.6; color: var(--text); }
-  .memo-entry-meta { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
-  .memo-entry-del {
-    background: none; border: none; cursor: pointer;
-    font-size: 18px; color: var(--text-dim); flex-shrink: 0;
-    padding: 0 4px;
-  }
-  .memo-entry-del:active { color: var(--danger); }
+  input[type=file]{ display:none; }
 </style>
 </head>
 <body>
+<div class="wrap">
 
-<header>
-  <div class="logo-mark">💬</div>
-  <div>
-    <h1>しゃべメモ</h1>
-    <p id="header-sub">写真にメモを残します</p>
+  <header>
+    <div class="eyebrow">FIELD VOICE MEMO — BETA TEST BUILD</div>
+    <h1>しゃべメモ β</h1>
+    <div class="sub">撮って→喋る。認識精度の実地検証用</div>
+  </header>
+
+  <div class="support-warn" id="supportWarn">
+    この端末・ブラウザは音声認識(Web Speech API)に対応していない可能性があります。Android版Google Chromeでの利用を推奨します。
   </div>
-</header>
 
-<!-- ─── モード選択 ─── -->
-<div id="mode-select">
-  <div class="mode-title">どちらで使いますか？</div>
-  <div class="mode-cards">
-
-    <div class="mode-card camera" onclick="selectMode('camera')">
-      <div class="mode-icon">📷</div>
-      <div class="mode-info">
-        <div class="mode-name">スマホで撮影</div>
-        <div class="mode-sub">写真を撮影してメモを追加します</div>
-      </div>
-      <div class="mode-arrow">›</div>
+  <div class="device">
+    <div class="device-head">
+      <span class="label">受信ログ</span>
+      <span class="rec-dot" id="recDot"></span>
     </div>
-
-    <div class="mode-card memo" onclick="selectMode('memo')">
-      <div class="mode-icon">🎙</div>
-      <div class="mode-info">
-        <div class="mode-name">メモだけ残す</div>
-        <div class="mode-sub">デジカメ使用時・音声メモのみ保存します</div>
+    <div class="readout mono" id="readout"><span class="placeholder">写真を撮ってから、マイクボタンで喋ってください…</span></div>
+    <div class="photo-row" id="photoRow" style="display:none;">
+      <img class="photo-thumb" id="photoThumb" alt="撮影写真">
+      <div class="photo-meta">
+        <b id="photoName">photo.jpg</b>
+        <span id="photoTime">--:--:--</span>
       </div>
-      <div class="mode-arrow">›</div>
     </div>
-
+    <div class="no-photo" id="noPhotoMsg">写真未選択</div>
   </div>
+
+  <div class="controls">
+    <button class="btn btn-photo" id="btnPhoto">
+      <span class="btn-icon">📷</span> 写真を撮る
+    </button>
+    <button class="btn btn-mic" id="btnMic" disabled>
+      <span class="btn-icon">🎙️</span> <span id="micLabel">メモを喋る</span>
+    </button>
+  </div>
+  <input type="file" id="cameraInput" accept="image/*" capture="environment">
+
+  <div class="parsed" id="parsedBox">
+    <div class="parsed-head">自動分解結果 — 必要なら修正してください</div>
+    <div class="field">
+      <label>識別子 (番号・エリア名など)</label>
+      <input type="text" id="fIdent" placeholder="例）0023 / エリアA">
+    </div>
+    <div class="field">
+      <label>数値・状態</label>
+      <input type="text" id="fNum" placeholder="例）0.3mm / 150枚">
+    </div>
+    <div class="field">
+      <label>メモ</label>
+      <input type="text" id="fMemo" placeholder="例）ひび割れ">
+    </div>
+    <div class="field">
+      <label>認識された元テキスト（編集不可・検証用）</label>
+      <input type="text" id="fRaw" readonly style="color:var(--text-dim);">
+    </div>
+    <div class="save-row">
+      <button class="btn btn-retry" id="btnRetry">🔄 撮り直す</button>
+      <button class="btn btn-save" id="btnSave">✓ 保存する</button>
+    </div>
+  </div>
+
+  <div class="section-title">
+    <span>記録ログ <span class="count" id="entryCount">(0)</span></span>
+    <a href="#" class="export-link" id="btnExport">CSV書き出し ↓</a>
+  </div>
+  <div id="entryList">
+    <div class="empty" id="emptyMsg">まだ記録がありません</div>
+  </div>
+
 </div>
 
-<main id="main-camera" style="display:none;">
-
-  <!-- STEP 1: 写真 -->
-  <div class="step-card active" id="step1">
-    <div class="step-label">STEP 1</div>
-    <div class="step-title">撮影または画像を選択</div>
-
-    <div class="btn-row">
-      <button class="btn btn-amber" onclick="openCamera()">📷 撮影する</button>
-      <button class="btn btn-outline" onclick="openGallery()">🖼 ギャラリーから選択</button>
-    </div>
-
-    <div id="preview-wrap">
-      <img id="preview-img" src="" alt="選択した写真">
-      <div id="preview-badge">読み込み中…</div>
-    </div>
-  </div>
-
-  <!-- STEP 2: メモ -->
-  <div class="step-card locked" id="step2">
-    <div class="step-label">STEP 2</div>
-    <div class="step-title">メモを追加する</div>
-    <div class="step-desc">音声入力または、直接入力してください</div>
-
-    <button class="btn btn-outline" id="voice-btn" onclick="toggleVoice()">
-      🎤 音声で入力
-    </button>
-
-    <textarea id="memo-area" placeholder="ここにメモが入ります。直接入力もできます。" rows="4"></textarea>
-
-    <div id="gps-status">
-      <div class="gps-dot"></div>
-      <span id="gps-text">GPS取得中…</span>
-    </div>
-  </div>
-
-  <!-- STEP 3: 保存（カメラモード） -->
-  <div class="step-card locked" id="step3">
-    <div class="step-label">STEP 3</div>
-    <div class="step-title">保存する</div>
-    <div class="step-desc">画像にテキスト情報をプラスします</div>
-
-    <button class="btn btn-success" onclick="saveFile()">💾 保存</button>
-    <button class="btn btn-blue" style="margin-top:8px" onclick="openFGM()">🗺 Field GPS Mapperで開く</button>
-    <button class="btn btn-ghost" style="margin-top:8px" onclick="resetAll()">↩ 最初からやり直す</button>
-  </div>
-
-</main>
-
-<!-- ─── メモモード ─── -->
-<main id="main-memo" style="display:none;">
-
-  <!-- STEP 1: メモ入力 -->
-  <div class="step-card active" id="m-step1">
-    <div class="step-label">STEP 1</div>
-    <div class="step-title">メモを入力する</div>
-    <div class="step-desc">音声入力または、直接入力してください</div>
-
-    <button class="btn btn-outline" id="m-voice-btn" onclick="toggleMemoVoice()">
-      🎤 音声で入力
-    </button>
-
-    <textarea id="m-memo-area" placeholder="現場メモを入力してください。音声入力後に修正もできます。" rows="5"></textarea>
-
-    <div id="m-gps-status" style="display:none;">
-      <div class="gps-dot"></div>
-      <span id="m-gps-text">GPS取得中…</span>
-    </div>
-
-    <button class="btn btn-amber" style="margin-top:14px" onclick="addMemoEntry()">＋ このメモを追加</button>
-  </div>
-
-  <!-- STEP 2: メモ一覧 -->
-  <div class="step-card locked" id="m-step2">
-    <div class="step-label">STEP 2</div>
-    <div class="step-title">保存済みメモ</div>
-    <div class="step-desc">追加したメモの一覧です。続けて追加できます。</div>
-
-    <div id="memo-list" style="margin-top:12px; display:flex; flex-direction:column; gap:8px;"></div>
-
-    <button class="btn btn-amber" style="margin-top:14px" onclick="addAnotherMemo()">＋ メモを追加する</button>
-    <button class="btn btn-success" style="margin-top:8px" onclick="exportCSV()">📤 CSVで書き出す</button>
-    <button class="btn btn-blue" style="margin-top:8px" onclick="openFGM()">🗺 Field GPS Mapperで開く</button>
-    <button class="btn btn-ghost" style="margin-top:8px" onclick="resetAll()">↩ 最初からやり直す</button>
-  </div>
-
-</main>
-
-<footer>データは端末内のみ。外部送信なし。</footer>
-
-<div id="toast"></div>
-
-<!-- Hidden file inputs -->
-<input type="file" id="camera-input" accept="image/*" capture="environment">
-<input type="file" id="gallery-input" accept="image/*">
-
-<!-- piexifjs for EXIF writing -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/piexifjs/1.0.6/piexif.js"></script>
-
 <script>
-// ─── State ───────────────────────────────────────────
-let state = {
-  mode:        null,   // 'camera' | 'memo'
-  file:        null,
-  dataUrl:     null,
-  memo:        '',
-  gps:         null,
-  recognition: null,
-  isRecording: false,
-  memoEntries: [],     // メモモード用：{text, datetime, lat, lng}
-};
+(function(){
+  const $ = (id) => document.getElementById(id);
 
-// ─── Mode Select ─────────────────────────────────────
-function selectMode(mode) {
-  state.mode = mode;
-  document.getElementById('mode-select').style.display = 'none';
+  const btnPhoto = $('btnPhoto');
+  const cameraInput = $('cameraInput');
+  const photoThumb = $('photoThumb');
+  const photoRow = $('photoRow');
+  const noPhotoMsg = $('noPhotoMsg');
+  const photoName = $('photoName');
+  const photoTime = $('photoTime');
 
-  if (mode === 'camera') {
-    document.getElementById('main-camera').style.display = 'flex';
-    document.getElementById('header-sub').textContent = '写真にメモを残します';
-    // GPS先取り
+  const btnMic = $('btnMic');
+  const micLabel = $('micLabel');
+  const readout = $('readout');
+  const recDot = $('recDot');
+  const supportWarn = $('supportWarn');
+
+  const parsedBox = $('parsedBox');
+  const fIdent = $('fIdent'), fNum = $('fNum'), fMemo = $('fMemo'), fRaw = $('fRaw');
+  const btnSave = $('btnSave'), btnRetry = $('btnRetry');
+
+  const entryList = $('entryList');
+  const emptyMsg = $('emptyMsg');
+  const entryCount = $('entryCount');
+  const btnExport = $('btnExport');
+
+  let pendingPhoto = null;
+  let currentRawText = '';
+  let entries = [];
+  let recognizing = false;
+
+  btnPhoto.addEventListener('click', () => cameraInput.click());
+  cameraInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    const now = new Date();
+    pendingPhoto = {
+      url,
+      name: file.name || 'photo.jpg',
+      time: now.toLocaleTimeString('ja-JP')
+    };
+    photoThumb.src = url;
+    photoName.textContent = pendingPhoto.name;
+    photoTime.textContent = pendingPhoto.time;
+    photoRow.style.display = 'flex';
+    noPhotoMsg.style.display = 'none';
+    btnMic.disabled = false;
+    readout.innerHTML = '<span class="placeholder">マイクボタンを押して喋ってください…</span>';
+    parsedBox.classList.remove('show');
+  });
+
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let recognition = null;
+  if (!SR) {
+    supportWarn.classList.add('show');
   } else {
-    document.getElementById('main-memo').style.display = 'flex';
-    document.getElementById('header-sub').textContent = 'メモだけ残します';
-    startMemoGps();
-  }
-}
+    recognition = new SR();
+    recognition.lang = 'ja-JP';
+    recognition.continuous = false;
+    recognition.interimResults = true;
 
-// ─── Camera / Gallery ────────────────────────────────
-function openCamera()  { document.getElementById('camera-input').click(); }
-function openGallery() { document.getElementById('gallery-input').click(); }
+    recognition.onstart = () => {
+      recognizing = true;
+      btnMic.classList.add('recording');
+      micLabel.textContent = '認識中…（タップで終了）';
+      recDot.classList.add('live');
+      readout.innerHTML = '<span class="cursor"></span>';
+    };
 
-document.getElementById('camera-input').addEventListener('change',  e => handleFile(e.target.files[0]));
-document.getElementById('gallery-input').addEventListener('change', e => handleFile(e.target.files[0]));
-
-function handleFile(file) {
-  if (!file) return;
-  state.file = file;
-
-  const reader = new FileReader();
-  reader.onload = e => {
-    state.dataUrl = e.target.result;
-
-    // preview
-    const img = document.getElementById('preview-img');
-    img.src = state.dataUrl;
-    const wrap = document.getElementById('preview-wrap');
-    wrap.style.display = 'block';
-
-    // badge
-    const badge = document.getElementById('preview-badge');
-    badge.textContent = file.name;
-
-    // unlock step2
-    setStep(2);
-    startGps();
-    toast('写真を読み込みました', 'success');
-  };
-  reader.readAsDataURL(file);
-}
-
-// ─── Step control ─────────────────────────────────────
-function setStep(n) {
-  [1,2,3].forEach(i => {
-    const el = document.getElementById('step'+i);
-    el.classList.remove('active','done','locked');
-    if (i < n)       el.classList.add('done');
-    else if (i === n) el.classList.add('active');
-    else             el.classList.add('locked');
-  });
-}
-
-// ─── GPS ──────────────────────────────────────────────
-function startGps() {
-  const status = document.getElementById('gps-status');
-  const txt    = document.getElementById('gps-text');
-  status.style.display = 'flex';
-  status.className = 'getting';
-  txt.textContent = 'GPS取得中…';
-
-  if (!navigator.geolocation) {
-    status.className = 'err';
-    txt.textContent = 'GPS非対応端末です';
-    return;
-  }
-  navigator.geolocation.getCurrentPosition(
-    pos => {
-      state.gps = {
-        lat: pos.coords.latitude,
-        lng: pos.coords.longitude,
-        alt: pos.coords.altitude,
-      };
-      status.className = 'got';
-      txt.textContent = `📍 ${state.gps.lat.toFixed(6)}, ${state.gps.lng.toFixed(6)}`;
-      checkStep3();
-    },
-    err => {
-      status.className = 'err';
-      txt.textContent = 'GPS取得失敗（メモのみ保存されます）';
-      checkStep3();
-    },
-    { enableHighAccuracy: true, timeout: 10000 }
-  );
-}
-
-// ─── Voice ───────────────────────────────────────────
-function toggleVoice() {
-  if (state.isRecording) stopVoice();
-  else startVoice();
-}
-
-function startVoice() {
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition) { toast('音声認識非対応ブラウザです', 'error'); return; }
-
-  const rec = new SpeechRecognition();
-  rec.lang = 'ja-JP';
-  rec.continuous = true;
-  rec.interimResults = true;
-
-  let finalText = document.getElementById('memo-area').value;
-
-  rec.onresult = e => {
-    let interim = '';
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      const t = e.results[i][0].transcript;
-      if (e.results[i].isFinal) finalText += t;
-      else interim = t;
-    }
-    document.getElementById('memo-area').value = finalText + interim;
-  };
-
-  rec.onerror = e => {
-    toast('音声エラー: ' + e.error, 'error');
-    stopVoice();
-  };
-
-  rec.onend = () => {
-    if (state.isRecording) rec.start(); // 自動再起動
-  };
-
-  rec.start();
-  state.recognition = rec;
-  state.isRecording = true;
-
-  const btn = document.getElementById('voice-btn');
-  btn.classList.add('recording');
-  btn.innerHTML = '⏹ 録音中止';
-  toast('録音中です…「録音中止」ボタンで終了');
-}
-
-function stopVoice() {
-  if (state.recognition) {
-    state.recognition.onend = null;
-    state.recognition.stop();
-    state.recognition = null;
-  }
-  state.isRecording = false;
-
-  const btn = document.getElementById('voice-btn');
-  btn.classList.remove('recording');
-  btn.innerHTML = '🎤 音声で入力';
-
-  const memo = document.getElementById('memo-area').value.trim();
-  if (memo) { toast('音声入力完了', 'success'); checkStep3(); }
-}
-
-// メモ入力でもstep3チェック
-document.getElementById('memo-area').addEventListener('input', () => {
-  checkStep3();
-});
-
-function checkStep3() {
-  const memo = document.getElementById('memo-area').value.trim();
-  if (memo || state.gps) setStep(3);
-}
-
-// ─── Save ────────────────────────────────────────────
-async function saveFile() {
-  if (!state.dataUrl) { toast('写真がありません', 'error'); return; }
-
-  const memo = document.getElementById('memo-area').value.trim();
-  toast('保存中…');
-
-  try {
-    let jpegData = state.dataUrl;
-
-    // EXIFに書き込む
-    try {
-      let exifObj = {};
-      try { exifObj = piexif.load(jpegData); } catch(e) { exifObj = {"0th":{}, "Exif":{}, "GPS":{}}; }
-
-      // テキストをImageDescriptionに
-      if (memo) {
-        exifObj["0th"][piexif.ImageIFD.ImageDescription] = memo;
-        exifObj["0th"][piexif.ImageIFD.XPComment] = encodeUTF16LE(memo);
+    recognition.onresult = (event) => {
+      let interim = '', final = '';
+      for (let i = 0; i < event.results.length; i++) {
+        const t = event.results[i][0].transcript;
+        if (event.results[i].isFinal) final += t;
+        else interim += t;
       }
+      const combined = final + interim;
+      currentRawText = final || combined;
+      readout.innerHTML = escapeHtml(combined) + '<span class="cursor"></span>';
+    };
 
-      // GPSをEXIFに
-      if (state.gps) {
-        exifObj["GPS"][piexif.GPSIFD.GPSLatitudeRef]  = state.gps.lat >= 0 ? 'N' : 'S';
-        exifObj["GPS"][piexif.GPSIFD.GPSLatitude]     = decimalToDMS(Math.abs(state.gps.lat));
-        exifObj["GPS"][piexif.GPSIFD.GPSLongitudeRef] = state.gps.lng >= 0 ? 'E' : 'W';
-        exifObj["GPS"][piexif.GPSIFD.GPSLongitude]    = decimalToDMS(Math.abs(state.gps.lng));
-        if (state.gps.alt !== null && state.gps.alt !== undefined) {
-          exifObj["GPS"][piexif.GPSIFD.GPSAltitudeRef] = 0;
-          exifObj["GPS"][piexif.GPSIFD.GPSAltitude]    = [Math.round(Math.abs(state.gps.alt) * 100), 100];
-        }
+    recognition.onerror = (event) => {
+      readout.innerHTML = '<span class="placeholder">認識エラー（' + event.error + '）。もう一度お試しください。</span>';
+      stopRecognitionUI();
+    };
+
+    recognition.onend = () => {
+      stopRecognitionUI();
+      if (currentRawText && currentRawText.trim()) {
+        readout.innerHTML = escapeHtml(currentRawText);
+        openParsed(currentRawText.trim());
+      } else {
+        readout.innerHTML = '<span class="placeholder">聞き取れませんでした。マイクボタンでもう一度。</span>';
       }
+    };
+  }
 
-      const exifBytes = piexif.dump(exifObj);
-      jpegData = piexif.insert(exifBytes, jpegData);
-    } catch(exifErr) {
-      console.warn('EXIF書き込みエラー（写真のみ保存）:', exifErr);
+  function stopRecognitionUI(){
+    recognizing = false;
+    btnMic.classList.remove('recording');
+    micLabel.textContent = 'メモを喋る';
+    recDot.classList.remove('live');
+  }
+
+  btnMic.addEventListener('click', () => {
+    if (!recognition) return;
+    if (recognizing) {
+      recognition.stop();
+      return;
+    }
+    if (!pendingPhoto) return;
+    currentRawText = '';
+    try { recognition.start(); } catch(e) { }
+  });
+
+  function parseSpeech(text){
+    let segments;
+    if (text.includes('、')) segments = text.split('、');
+    else if (text.includes(',')) segments = text.split(',');
+    else if (text.includes(' ')) segments = text.split(/\s+/);
+    else segments = [text];
+
+    segments = segments.map(s => s.trim()).filter(Boolean);
+
+    const numPattern = /[0-9０-９]+(\.[0-9０-９]+)?\s*(mm|cm|m|km|kg|g|枚|個|ヶ所|箇所|本|件|人|台|%)?/;
+
+    let ident = '', numStatus = '', memo = '';
+
+    if (segments.length >= 3) {
+      ident = segments[0];
+      numStatus = segments[1];
+      memo = segments.slice(2).join('、');
+    } else if (segments.length === 2) {
+      ident = segments[0];
+      const m = segments[1].match(numPattern);
+      if (m && m[0].trim()) {
+        numStatus = m[0].trim();
+        memo = segments[1];
+      } else {
+        memo = segments[1];
+      }
+    } else if (segments.length === 1) {
+      memo = segments[0];
+      const m = segments[0].match(numPattern);
+      if (m && m[0].trim()) numStatus = m[0].trim();
     }
 
-    // ダウンロード
-    const now  = new Date();
-    const ts   = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-    const fname = `FGM_${ts}.jpg`;
-
-    const link  = document.createElement('a');
-    link.href   = jpegData;
-    link.download = fname;
-    link.click();
-
-    toast(`保存完了：${fname}`, 'success');
-
-    // 少し待ってリセット案内
-    setTimeout(() => {
-      if (confirm('続けて別の写真を登録しますか？')) resetAll();
-    }, 1200);
-
-  } catch(err) {
-    console.error(err);
-    toast('保存に失敗しました', 'error');
+    return { ident, numStatus, memo };
   }
-}
 
-// ─── Utils ───────────────────────────────────────────
-function decimalToDMS(decimal) {
-  const d = Math.floor(decimal);
-  const mFull = (decimal - d) * 60;
-  const m = Math.floor(mFull);
-  const s = Math.round((mFull - m) * 60 * 100);
-  return [[d,1],[m,1],[s,100]];
-}
-
-function encodeUTF16LE(str) {
-  const arr = [];
-  for (let i = 0; i < str.length; i++) {
-    const c = str.charCodeAt(i);
-    arr.push(c & 0xff, (c >> 8) & 0xff);
+  function openParsed(raw){
+    const p = parseSpeech(raw);
+    fIdent.value = p.ident;
+    fNum.value = p.numStatus;
+    fMemo.value = p.memo;
+    fRaw.value = raw;
+    parsedBox.classList.add('show');
+    parsedBox.scrollIntoView({ behavior:'smooth', block:'nearest' });
   }
-  return arr;
-}
 
-function pad(n) { return String(n).padStart(2,'0'); }
+  btnRetry.addEventListener('click', () => {
+    parsedBox.classList.remove('show');
+    readout.innerHTML = '<span class="placeholder">マイクボタンを押して喋ってください…</span>';
+  });
 
-function toast(msg, type='') {
-  const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.className = 'show' + (type ? ' '+type : '');
-  clearTimeout(el._t);
-  el._t = setTimeout(() => el.className = '', 2800);
-}
+  btnSave.addEventListener('click', () => {
+    if (!pendingPhoto) return;
+    const entry = {
+      id: Date.now(),
+      photoUrl: pendingPhoto.url,
+      photoName: pendingPhoto.name,
+      time: pendingPhoto.time,
+      ident: fIdent.value.trim(),
+      numStatus: fNum.value.trim(),
+      memo: fMemo.value.trim(),
+      raw: fRaw.value
+    };
+    entries.unshift(entry);
+    renderEntries();
 
-// ─── Memo Mode ───────────────────────────────────────
-let memoGps = null;
+    parsedBox.classList.remove('show');
+    photoRow.style.display = 'none';
+    noPhotoMsg.style.display = 'block';
+    pendingPhoto = null;
+    btnMic.disabled = true;
+    readout.innerHTML = '<span class="placeholder">写真を撮ってから、マイクボタンで喋ってください…</span>';
+    cameraInput.value = '';
+  });
 
-function startMemoGps() {
-  const status = document.getElementById('m-gps-status');
-  const txt    = document.getElementById('m-gps-text');
-  status.style.display = 'flex';
-  status.className = 'getting';
-  txt.textContent = 'GPS取得中…';
-
-  if (!navigator.geolocation) {
-    status.className = 'err';
-    txt.textContent = 'GPS非対応端末です';
-    return;
-  }
-  navigator.geolocation.getCurrentPosition(
-    pos => {
-      memoGps = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-      status.className = 'got';
-      txt.textContent = `📍 ${memoGps.lat.toFixed(6)}, ${memoGps.lng.toFixed(6)}`;
-    },
-    err => {
-      status.className = 'err';
-      txt.textContent = 'GPS取得失敗（メモのみ保存）';
-      memoGps = null;
-    },
-    { enableHighAccuracy: true, timeout: 10000 }
-  );
-}
-
-function toggleMemoVoice() {
-  if (state.isRecording) stopMemoVoice();
-  else startMemoVoice();
-}
-
-function startMemoVoice() {
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition) { toast('音声認識非対応ブラウザです', 'error'); return; }
-
-  const rec = new SpeechRecognition();
-  rec.lang = 'ja-JP';
-  rec.continuous = true;
-  rec.interimResults = true;
-
-  let finalText = document.getElementById('m-memo-area').value;
-
-  rec.onresult = e => {
-    let interim = '';
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      const t = e.results[i][0].transcript;
-      if (e.results[i].isFinal) finalText += t;
-      else interim = t;
+  function renderEntries(){
+    entryCount.textContent = '(' + entries.length + ')';
+    if (entries.length === 0) {
+      entryList.innerHTML = '';
+      entryList.appendChild(emptyMsg);
+      return;
     }
-    document.getElementById('m-memo-area').value = finalText + interim;
-  };
-  rec.onerror = () => stopMemoVoice();
-  rec.onend   = () => { if (state.isRecording) rec.start(); };
-
-  rec.start();
-  state.recognition = rec;
-  state.isRecording = true;
-
-  const btn = document.getElementById('m-voice-btn');
-  btn.classList.add('recording');
-  btn.innerHTML = '⏹ 録音中止';
-  toast('録音中です…');
-}
-
-function stopMemoVoice() {
-  if (state.recognition) {
-    state.recognition.onend = null;
-    state.recognition.stop();
-    state.recognition = null;
+    entryList.innerHTML = '';
+    entries.forEach(en => {
+      const div = document.createElement('div');
+      div.className = 'entry';
+      div.innerHTML = `
+        <div class="entry-top">
+          <img class="entry-thumb" src="${en.photoUrl}" alt="">
+          <div class="entry-fields">
+            ${en.ident ? `<span class="entry-tag">${escapeHtml(en.ident)}</span>` : ''}
+            ${en.numStatus ? `<span class="entry-tag">${escapeHtml(en.numStatus)}</span>` : ''}
+            <div class="entry-memo">${escapeHtml(en.memo || '(メモなし)')}</div>
+          </div>
+        </div>
+        <div class="entry-raw">${en.time} ／ 元テキスト: ${escapeHtml(en.raw)}</div>
+        <button class="entry-del" data-id="${en.id}">この記録を削除</button>
+      `;
+      entryList.appendChild(div);
+    });
+    entryList.querySelectorAll('.entry-del').forEach(btn => {
+      btn.addEventListener('click', () => {
+        entries = entries.filter(e => e.id !== Number(btn.dataset.id));
+        renderEntries();
+      });
+    });
   }
-  state.isRecording = false;
-  const btn = document.getElementById('m-voice-btn');
-  btn.classList.remove('recording');
-  btn.innerHTML = '🎤 音声で入力';
-  toast('音声入力完了', 'success');
-}
 
-function addMemoEntry() {
-  const text = document.getElementById('m-memo-area').value.trim();
-  if (!text) { toast('メモを入力してください', 'error'); return; }
-
-  const now = new Date();
-  const datetime = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-
-  const entry = {
-    text,
-    datetime,
-    lat: memoGps ? memoGps.lat : null,
-    lng: memoGps ? memoGps.lng : null,
-  };
-  state.memoEntries.push(entry);
-
-  // リスト表示
-  renderMemoList();
-
-  // STEP2をアクティブに
-  document.getElementById('m-step1').classList.remove('active');
-  document.getElementById('m-step1').classList.add('done');
-  document.getElementById('m-step2').classList.remove('locked');
-  document.getElementById('m-step2').classList.add('active');
-
-  document.getElementById('m-memo-area').value = '';
-  toast('メモを追加しました', 'success');
-
-  // GPS再取得
-  startMemoGps();
-}
-
-function renderMemoList() {
-  const list = document.getElementById('memo-list');
-  list.innerHTML = '';
-  state.memoEntries.forEach((entry, i) => {
-    const gpsText = entry.lat ? `${entry.lat.toFixed(5)}, ${entry.lng.toFixed(5)}` : 'GPS情報なし';
-    const div = document.createElement('div');
-    div.className = 'memo-entry';
-    div.innerHTML = `
-      <div class="memo-entry-icon">💬</div>
-      <div class="memo-entry-body">
-        <div class="memo-entry-text">${entry.text}</div>
-        <div class="memo-entry-meta">${entry.datetime}　📍${gpsText}</div>
-      </div>
-      <button class="memo-entry-del" onclick="deleteMemoEntry(${i})">✕</button>
-    `;
-    list.appendChild(div);
+  btnExport.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (entries.length === 0) { alert('記録がまだありません。'); return; }
+    const header = ['時刻', '識別子', '数値・状態', 'メモ', '元テキスト（認識結果）'];
+    const rows = entries.map(en => [en.time, en.ident, en.numStatus, en.memo, en.raw]);
+    const csv = [header, ...rows].map(r =>
+      r.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(',')
+    ).join('\r\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'shabememo_log_' + new Date().toISOString().slice(0,10) + '.csv';
+    a.click();
+    URL.revokeObjectURL(url);
   });
-}
 
-function deleteMemoEntry(i) {
-  state.memoEntries.splice(i, 1);
-  renderMemoList();
-  if (state.memoEntries.length === 0) {
-    document.getElementById('m-step2').classList.add('locked');
-    document.getElementById('m-step2').classList.remove('active');
-    document.getElementById('m-step1').classList.remove('done');
-    document.getElementById('m-step1').classList.add('active');
+  function escapeHtml(str){
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
   }
-}
-
-function addAnotherMemo() {
-  document.getElementById('m-step1').classList.remove('done');
-  document.getElementById('m-step1').classList.add('active');
-  document.getElementById('m-memo-area').focus();
-  window.scrollTo(0, 0);
-  startMemoGps();
-}
-
-function exportCSV() {
-  if (state.memoEntries.length === 0) { toast('メモがありません', 'error'); return; }
-
-  const header = 'datetime,lat,lng,text';
-  const rows = state.memoEntries.map(e => {
-    const text = `"${e.text.replace(/"/g, '""')}"`;
-    return `${e.datetime},${e.lat ?? ''},${e.lng ?? ''},${text}`;
-  });
-  const csv = '\uFEFF' + [header, ...rows].join('\n'); // BOM付きUTF-8（Excel対応）
-
-  const now  = new Date();
-  const ts   = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}`;
-  const fname = `FGM_memo_${ts}.csv`;
-
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url  = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = fname;
-  link.click();
-  URL.revokeObjectURL(url);
-
-  toast(`書き出し完了：${fname}`, 'success');
-}
-
-// ─── FGM誘導 ─────────────────────────────────────────
-function openFGM() {
-  window.open('https://mandeendoh-glitch.github.io/field-gps-mapper/', '_blank');
-}
-
-// ─── Reset ───────────────────────────────────────────
-function resetAll() {
-  state = { mode:null, file:null, dataUrl:null, memo:'', gps:null, recognition:null, isRecording:false, memoEntries:[] };
-  memoGps = null;
-
-  // モード選択に戻る
-  document.getElementById('mode-select').style.display = 'flex';
-  document.getElementById('main-camera').style.display = 'none';
-  document.getElementById('main-memo').style.display   = 'none';
-  document.getElementById('header-sub').textContent = '写真にメモを残します';
-
-  // カメラモードリセット
-  document.getElementById('preview-wrap').style.display = 'none';
-  document.getElementById('preview-img').src = '';
-  document.getElementById('memo-area').value = '';
-  document.getElementById('gps-status').style.display = 'none';
-  document.getElementById('camera-input').value = '';
-  document.getElementById('gallery-input').value = '';
-  const btn = document.getElementById('voice-btn');
-  btn.classList.remove('recording');
-  btn.innerHTML = '🎤 音声で入力';
-  [1,2,3].forEach(i => {
-    const el = document.getElementById('step'+i);
-    el.className = 'step-card ' + (i===1 ? 'active' : 'locked');
-  });
-
-  // メモモードリセット
-  document.getElementById('m-memo-area').value = '';
-  document.getElementById('m-gps-status').style.display = 'none';
-  document.getElementById('memo-list').innerHTML = '';
-  const mbtn = document.getElementById('m-voice-btn');
-  mbtn.classList.remove('recording');
-  mbtn.innerHTML = '🎤 音声で入力';
-  document.getElementById('m-step1').className = 'step-card active';
-  document.getElementById('m-step2').className = 'step-card locked';
-}
-
-// ─── PWA Service Worker ───────────────────────────────
-if ('serviceWorker' in navigator) {
-  // インラインSW登録（外部ファイル不要）
-  const swCode = `
-    self.addEventListener('install',  e => self.skipWaiting());
-    self.addEventListener('activate', e => clients.claim());
-    self.addEventListener('fetch',    e => e.respondWith(fetch(e.request).catch(() => new Response('offline'))));
-  `;
-  const blob = new Blob([swCode], {type:'application/javascript'});
-  const swUrl = URL.createObjectURL(blob);
-  navigator.serviceWorker.register(swUrl).catch(()=>{});
-}
+})();
 </script>
 </body>
 </html>
