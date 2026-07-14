@@ -132,7 +132,7 @@
 <div class="wrap">
 
   <header>
-    <div class="eyebrow">FIELD VOICE MEMO — BETA TEST BUILD v2</div>
+    <div class="eyebrow">FIELD VOICE MEMO — BETA TEST BUILD v3</div>
     <h1>しゃべメモ β</h1>
     <div class="sub">撮って→喋る。GPS・方角の自動取得つき</div>
   </header>
@@ -156,7 +156,7 @@
       <span class="label">受信ログ</span>
       <span class="rec-dot" id="recDot"></span>
     </div>
-    <div class="readout mono" id="readout"><span class="placeholder">写真を撮ってから、マイクボタンで喋ってください…</span></div>
+    <div class="readout mono" id="readout"><span class="placeholder">マイクボタンで喋る（写真は任意）、または先に写真を撮ってください…</span></div>
     <div class="photo-row" id="photoRow" style="display:none;">
       <img class="photo-thumb" id="photoThumb" alt="撮影写真">
       <div class="photo-meta">
@@ -165,14 +165,14 @@
         <div class="geo-badges" id="geoBadges"></div>
       </div>
     </div>
-    <div class="no-photo" id="noPhotoMsg">写真未選択</div>
+    <div class="no-photo" id="noPhotoMsg">写真なし（音声メモのみでも記録できます）</div>
   </div>
 
   <div class="controls">
     <button class="btn btn-photo" id="btnPhoto">
       <span class="btn-icon">📷</span> 写真を撮る
     </button>
-    <button class="btn btn-mic" id="btnMic" disabled>
+    <button class="btn btn-mic" id="btnMic">
       <span class="btn-icon">🎙️</span> <span id="micLabel">メモを喋る</span>
     </button>
   </div>
@@ -622,11 +622,20 @@
     recDot.classList.remove('live');
   }
 
+  let standaloneGeo = null; // 写真なしで喋った場合の単発GPS取得結果
+
   btnMic.addEventListener('click', () => {
     if (!recognition) return;
     if (recognizing) { recognition.stop(); return; }
-    if (!pendingPhoto) return;
     currentRawText = '';
+    standaloneGeo = null;
+    if (!pendingPhoto && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => { standaloneGeo = { lat: pos.coords.latitude, lng: pos.coords.longitude, alt: pos.coords.altitude }; },
+        () => { standaloneGeo = null; },
+        { enableHighAccuracy: true, timeout: 6000 }
+      );
+    }
     try { recognition.start(); } catch(e) { }
   });
 
@@ -669,14 +678,28 @@
   });
 
   btnSave.addEventListener('click', async () => {
-    if (!pendingPhoto) return;
-    const entry = {
+    const now = new Date();
+    const entry = pendingPhoto ? {
       id: Date.now(),
       photoBlob: pendingPhoto.blob,
       photoName: pendingPhoto.name,
       time: pendingPhoto.time,
       lat: pendingPhoto.lat, lng: pendingPhoto.lng, alt: pendingPhoto.alt, dir: pendingPhoto.dir,
       geoSource: pendingPhoto.geoSource,
+      ident: fIdent.value.trim(),
+      numStatus: fNum.value.trim(),
+      memo: fMemo.value.trim(),
+      raw: fRaw.value
+    } : {
+      id: Date.now(),
+      photoBlob: null,
+      photoName: null,
+      time: now.toLocaleTimeString('ja-JP'),
+      lat: standaloneGeo ? standaloneGeo.lat : null,
+      lng: standaloneGeo ? standaloneGeo.lng : null,
+      alt: standaloneGeo ? standaloneGeo.alt : null,
+      dir: null,
+      geoSource: standaloneGeo ? 'browser' : null,
       ident: fIdent.value.trim(),
       numStatus: fNum.value.trim(),
       memo: fMemo.value.trim(),
@@ -690,8 +713,8 @@
     photoRow.style.display = 'none';
     noPhotoMsg.style.display = 'block';
     pendingPhoto = null;
-    btnMic.disabled = true;
-    readout.innerHTML = '<span class="placeholder">写真を撮ってから、マイクボタンで喋ってください…</span>';
+    standaloneGeo = null;
+    readout.innerHTML = '<span class="placeholder">マイクボタンで喋る（写真は任意）、または先に写真を撮ってください…</span>';
     cameraInputFallback.value = '';
   });
 
@@ -717,12 +740,14 @@
     }
     entryList.innerHTML = '';
     entries.forEach(en => {
-      const thumbUrl = en.photoBlob ? URL.createObjectURL(en.photoBlob) : '';
+      const thumbHtml = en.photoBlob
+        ? `<img class="entry-thumb" src="${URL.createObjectURL(en.photoBlob)}" alt="" data-id="${en.id}" style="cursor:pointer;">`
+        : `<div class="entry-thumb" data-id="${en.id}" style="display:flex; align-items:center; justify-content:center; font-size:18px; cursor:pointer;">🎙️</div>`;
       const div = document.createElement('div');
       div.className = 'entry';
       div.innerHTML = `
         <div class="entry-top">
-          <img class="entry-thumb" src="${thumbUrl}" alt="" data-id="${en.id}" style="cursor:pointer;">
+          ${thumbHtml}
           <div class="entry-fields">
             ${en.ident ? `<span class="entry-tag">${escapeHtml(en.ident)}</span>` : ''}
             ${en.numStatus ? `<span class="entry-tag">${escapeHtml(en.numStatus)}</span>` : ''}
@@ -735,8 +760,8 @@
       `;
       entryList.appendChild(div);
     });
-    entryList.querySelectorAll('.entry-thumb').forEach(img => {
-      img.addEventListener('click', () => openDetail(Number(img.dataset.id)));
+    entryList.querySelectorAll('.entry-thumb, .entry-top > div[data-id]').forEach(el => {
+      el.addEventListener('click', () => openDetail(Number(el.dataset.id)));
     });
     entryList.querySelectorAll('.entry-del').forEach(btn => {
       btn.addEventListener('click', async () => {
@@ -752,7 +777,13 @@
   function openDetail(id){
     const en = entries.find(e => e.id === id);
     if (!en) return;
-    detailImg.src = en.photoBlob ? URL.createObjectURL(en.photoBlob) : '';
+    if (en.photoBlob) {
+      detailImg.src = URL.createObjectURL(en.photoBlob);
+      detailImg.style.display = 'block';
+    } else {
+      detailImg.src = '';
+      detailImg.style.display = 'none';
+    }
     detailTags.innerHTML =
       (en.ident ? `<span class="entry-tag">${escapeHtml(en.ident)}</span>` : '') +
       (en.numStatus ? `<span class="entry-tag">${escapeHtml(en.numStatus)}</span>` : '');
