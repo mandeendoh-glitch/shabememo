@@ -805,6 +805,29 @@
     });
   }
 
+  // 写真なし(音声のみ)の記録用に、位置情報だけを持つ丸マーカー画像を自動生成する
+  function makePlaceholderBlob(){
+    return new Promise((resolve) => {
+      const w = 480, h = 360;
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#1e2225';
+      ctx.fillRect(0, 0, w, h);
+      const cx = w / 2, cy = h / 2 - 25, r = 60;
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffb347'; ctx.fill();
+      ctx.lineWidth = 6; ctx.strokeStyle = '#1e2225'; ctx.stroke();
+      ctx.beginPath(); ctx.arc(cx, cy, r * 0.42, 0, Math.PI * 2);
+      ctx.fillStyle = '#1e2225'; ctx.fill();
+      ctx.fillStyle = '#ffb347';
+      ctx.font = 'bold 26px sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('音声メモ（写真なし）', cx, cy + r + 45);
+      canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.85);
+    });
+  }
+
   function buildNoteText(en){
     const parts = [];
     if (en.ident) parts.push(en.ident);
@@ -877,12 +900,20 @@
     }
 
     const zip = new JSZip();
-    let okCount = 0, skipCount = 0;
+    let okCount = 0, skipCount = 0, placeholderCount = 0;
 
     for (const en of entries) {
-      if (!en.photoBlob) { skipCount++; continue; }
+      let sourceBlob = en.photoBlob;
+      const isPlaceholder = !sourceBlob;
+
+      if (isPlaceholder) {
+        // 写真がない記録は、位置情報がある場合のみ丸マーカー画像を生成して代用する
+        if (en.lat === null || en.lat === undefined) { skipCount++; continue; }
+        sourceBlob = await makePlaceholderBlob();
+      }
+
       try {
-        const dataUrl = await blobToDataURL(en.photoBlob);
+        const dataUrl = await blobToDataURL(sourceBlob);
         let exifObj;
         try { exifObj = piexif.load(dataUrl); }
         catch(e) { exifObj = { '0th':{}, 'Exif':{}, 'GPS':{}, '1st':{}, 'thumbnail':null }; }
@@ -914,12 +945,16 @@
         const exifBytes = piexif.dump(exifObj);
         const newDataUrl = piexif.insert(exifBytes, dataUrl);
         const newBlob = dataURLtoBlob(newDataUrl);
-        zip.file(en.photoName || ('shabememo_' + en.id + '.jpg'), newBlob);
+        const fileName = en.photoName || ('shabememo_' + (isPlaceholder ? 'voice_' : '') + en.id + '.jpg');
+        zip.file(fileName, newBlob);
         okCount++;
+        if (isPlaceholder) placeholderCount++;
       } catch(err) {
         // EXIF書き込みに失敗した場合は元画像のまま格納（データを失わないため）
-        zip.file(en.photoName || ('shabememo_' + en.id + '.jpg'), en.photoBlob);
+        const fileName = en.photoName || ('shabememo_' + (isPlaceholder ? 'voice_' : '') + en.id + '.jpg');
+        zip.file(fileName, sourceBlob);
         okCount++;
+        if (isPlaceholder) placeholderCount++;
       }
     }
 
@@ -929,7 +964,10 @@
     a.href = url; a.download = 'shabememo_photos_' + new Date().toISOString().slice(0,10) + '.zip';
     a.click();
     URL.revokeObjectURL(url);
-    if (skipCount > 0) alert(`${okCount}件を書き出しました（写真なしの記録${skipCount}件はスキップ）`);
+    let msg = `${okCount}件を書き出しました`;
+    if (placeholderCount > 0) msg += `（うち音声のみ${placeholderCount}件はマーカー画像で代用）`;
+    if (skipCount > 0) msg += `／位置情報のない記録${skipCount}件はスキップ`;
+    alert(msg);
   });
 
   function escapeHtml(str){
