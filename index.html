@@ -179,13 +179,13 @@
   <input type="file" id="cameraInputFallback" accept="image/*" capture="environment">
 
   <!-- カメラ撮影モーダル -->
-  <div id="cameraModal" style="display:none; position:fixed; inset:0; background:#000; z-index:1000; flex-direction:column;">
-    <video id="cameraVideo" autoplay playsinline muted style="flex:1; width:100%; object-fit:cover; background:#000;"></video>
-    <div id="cameraStatus" class="mono" style="position:absolute; top:14px; left:14px; right:14px; display:flex; gap:8px; flex-wrap:wrap; z-index:2;"></div>
-    <div style="flex-shrink:0; background:#0c0e10; padding:18px 20px 26px; display:flex; align-items:center; justify-content:space-between;">
-      <button id="btnCameraCancel" style="background:none; border:1px solid var(--line); color:var(--text); border-radius:20px; padding:10px 16px; font-size:13px; font-family:inherit;">閉じる</button>
-      <button id="btnCameraShutter" style="width:66px; height:66px; border-radius:50%; background:#fff; border:4px solid var(--amber);"></button>
-      <div style="width:70px;"></div>
+  <div id="cameraModal" style="display:none; position:fixed; inset:0; height:100svh; background:#000; z-index:1000; flex-direction:column; overflow-y:auto;">
+    <video id="cameraVideo" autoplay playsinline muted style="flex:1 1 auto; min-height:0; width:100%; object-fit:cover; background:#000;"></video>
+    <div id="cameraStatus" class="mono" style="position:absolute; top:10px; left:10px; right:10px; display:flex; gap:6px; flex-wrap:wrap; z-index:2;"></div>
+    <div style="flex-shrink:0; background:#0c0e10; padding:10px 16px calc(10px + env(safe-area-inset-bottom, 0px)); display:flex; align-items:center; justify-content:space-between;">
+      <button id="btnCameraCancel" style="background:none; border:1px solid var(--line); color:var(--text); border-radius:20px; padding:8px 14px; font-size:13px; font-family:inherit; flex-shrink:0;">閉じる</button>
+      <button id="btnCameraShutter" style="width:56px; height:56px; border-radius:50%; background:#fff; border:4px solid var(--amber); flex-shrink:0;"></button>
+      <div style="width:60px; flex-shrink:0;"></div>
     </div>
   </div>
   <canvas id="captureCanvas" style="display:none;"></canvas>
@@ -420,7 +420,8 @@
   let cameraStream = null;
   let geoWatchId = null;
   let latestGeo = null; // {lat,lng,alt}
-  let latestHeading = null; // number|null
+  let latestHeading = null; // number|null（表示用：直近の生値）
+  let headingBuffer = []; // 直近サンプルを溜めて円環平均を取る（磁気ノイズ・瞬間的な乱れを緩和するため）
   let orientationHandler = null;
 
   function getCompassHeading(event){
@@ -434,6 +435,33 @@
     return null;
   }
 
+  // 角度は0°/360°をまたぐため、単純平均ではなく単位ベクトルに変換してから平均する（円環平均）
+  function circularMeanDeg(degrees){
+    if (!degrees.length) return null;
+    let sx = 0, sy = 0;
+    degrees.forEach(d => { const r = d * Math.PI / 180; sx += Math.cos(r); sy += Math.sin(r); });
+    let mean = Math.atan2(sy / degrees.length, sx / degrees.length) * 180 / Math.PI;
+    return (mean + 360) % 360;
+  }
+
+  // 直近サンプルのばらつき（角度分散）から、コンパスが安定しているかどうかを判定する
+  function headingStability(degrees){
+    if (degrees.length < 3) return null;
+    const mean = circularMeanDeg(degrees);
+    let maxDiff = 0;
+    degrees.forEach(d => {
+      let diff = Math.abs(d - mean);
+      if (diff > 180) diff = 360 - diff;
+      if (diff > maxDiff) maxDiff = diff;
+    });
+    return maxDiff <= 12; // ばらつきが12°以内なら「安定」とみなす
+  }
+
+  function pushHeadingSample(h){
+    headingBuffer.push(h);
+    if (headingBuffer.length > 8) headingBuffer.shift(); // 直近8サンプル（概ね1〜2秒分）だけ保持
+  }
+
   function updateCameraStatus(){
     const parts = [];
     if (latestGeo) {
@@ -442,15 +470,32 @@
       parts.push(`<span class="badge pending">📍 GPS取得中…</span>`);
     }
     if (latestHeading !== null) {
-      parts.push(`<span class="badge ok">🧭 ${latestHeading.toFixed(0)}°（${dirName(latestHeading)}）</span>`);
+      const stable = headingStability(headingBuffer);
+      const stabilityLabel = stable === null ? '' : (stable ? ' ✓安定' : ' ⚠揺れ中');
+      const badgeClass = stable === false ? 'warn' : 'ok';
+      parts.push(`<span class="badge ${badgeClass}">🧭 ${latestHeading.toFixed(0)}°（${dirName(latestHeading)}）${stabilityLabel}</span>`);
     } else {
       parts.push(`<span class="badge pending">🧭 方角取得中…</span>`);
     }
     cameraStatus.innerHTML = parts.join('');
   }
 
+  // ── カメラ画面の高さを実測値で直接指定する ──
+  // CSSのvh/svh等の単位はURLバーの表示状態やブラウザ対応状況で誤差が出るため、
+  // JavaScriptで「実際に見えている画面の高さ」をその都度測って直接指定する
+  function sizeCameraModal(){
+    const h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    cameraModal.style.height = h + 'px';
+  }
+  function onViewportResize(){ sizeCameraModal(); }
+
   async function openCamera(){
-    latestGeo = null; latestHeading = null;
+    latestGeo = null; latestHeading = null; headingBuffer = [];
+
+    sizeCameraModal();
+    if (window.visualViewport) window.visualViewport.addEventListener('resize', onViewportResize);
+    window.addEventListener('orientationchange', onViewportResize);
+    window.addEventListener('resize', onViewportResize);
 
     // 位置情報の継続監視を開始
     if (navigator.geolocation) {
@@ -462,7 +507,7 @@
     }
 
     // 方位センサーの許可・監視を開始（iOS13+は明示的な許可が必要）
-    orientationHandler = (e) => { const h = getCompassHeading(e); if (h !== null) { latestHeading = h; updateCameraStatus(); } };
+    orientationHandler = (e) => { const h = getCompassHeading(e); if (h !== null) { latestHeading = h; pushHeadingSample(h); updateCameraStatus(); } };
     try {
       if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
         const perm = await DeviceOrientationEvent.requestPermission();
@@ -480,6 +525,7 @@
       cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
       cameraVideo.srcObject = cameraStream;
       cameraModal.style.display = 'flex';
+      sizeCameraModal(); // 映像取得後、レイアウト確定後にもう一度合わせる
     } catch(err) {
       closeCameraSensors();
       // getUserMedia失敗時はOSのカメラアプリにフォールバック
@@ -500,6 +546,9 @@
     if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; }
     cameraModal.style.display = 'none';
     closeCameraSensors();
+    if (window.visualViewport) window.visualViewport.removeEventListener('resize', onViewportResize);
+    window.removeEventListener('orientationchange', onViewportResize);
+    window.removeEventListener('resize', onViewportResize);
   }
 
   btnPhoto.addEventListener('click', openCamera);
@@ -512,7 +561,7 @@
     captureCanvas.getContext('2d').drawImage(cameraVideo, 0, 0, w, h);
     captureCanvas.toBlob((blob) => {
       if (!blob) return;
-      const capturedGeo = latestGeo, capturedHeading = latestHeading;
+      const capturedGeo = latestGeo, capturedHeading = circularMeanDeg(headingBuffer);
       closeCamera();
       onPhotoCaptured(blob, capturedGeo, capturedHeading, 'device');
     }, 'image/jpeg', 0.85);
