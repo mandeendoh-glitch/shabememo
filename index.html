@@ -934,11 +934,11 @@
           exifObj['GPS'][piexif.GPSIFD.GPSLongitude] = toDMSRational(en.lng);
           if (en.alt !== null && en.alt !== undefined) {
             exifObj['GPS'][piexif.GPSIFD.GPSAltitudeRef] = en.alt < 0 ? 1 : 0;
-            exifObj['GPS'][piexif.GPSIFD.GPSAltitude] = [[Math.round(Math.abs(en.alt)*100), 100]];
+            exifObj['GPS'][piexif.GPSIFD.GPSAltitude] = [Math.round(Math.abs(en.alt)*100), 100];
           }
           if (en.dir !== null && en.dir !== undefined) {
             exifObj['GPS'][piexif.GPSIFD.GPSImgDirectionRef] = 'T';
-            exifObj['GPS'][piexif.GPSIFD.GPSImgDirection] = [[Math.round(en.dir*100), 100]];
+            exifObj['GPS'][piexif.GPSIFD.GPSImgDirection] = [Math.round(en.dir*100), 100];
           }
         }
 
