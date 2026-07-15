@@ -126,6 +126,11 @@
     border:1px dashed var(--line); border-radius:6px; }
 
   input[type=file]{ display:none; }
+
+  /* 横向きの時は、上下が大きく切れないよう「全体を映す」表示に切り替える */
+  @media (orientation: landscape) {
+    #cameraVideo { object-fit: contain !important; }
+  }
 </style>
 </head>
 <body>
@@ -526,6 +531,8 @@
       cameraVideo.srcObject = cameraStream;
       cameraModal.style.display = 'flex';
       sizeCameraModal(); // 映像取得後、レイアウト確定後にもう一度合わせる
+      // 対応ブラウザではフルスクリーン化を試みる（アドレスバー分の表示領域を稼ぐため。非対応でも無視されるだけ）
+      try { await document.documentElement.requestFullscreen(); } catch(e) {}
     } catch(err) {
       closeCameraSensors();
       // getUserMedia失敗時はOSのカメラアプリにフォールバック
@@ -549,6 +556,7 @@
     if (window.visualViewport) window.visualViewport.removeEventListener('resize', onViewportResize);
     window.removeEventListener('orientationchange', onViewportResize);
     window.removeEventListener('resize', onViewportResize);
+    if (document.fullscreenElement) { try { document.exitFullscreen(); } catch(e) {} }
   }
 
   btnPhoto.addEventListener('click', openCamera);
