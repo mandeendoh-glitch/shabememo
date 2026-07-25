@@ -3,36 +3,60 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>しゃべメモ β</title>
+<title>しゃべメモ（テスト版）</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg: #14171a;
-    --surface: #1e2225;
-    --surface-2: #262b2f;
-    --line: #33383c;
-    --text: #f2efe9;
-    --text-dim: #8b9096;
-    --amber: #ffb347;
-    --amber-dim: #7a6438;
-    --orange: #ff5722;
-    --green: #6fcf57;
-    --red: #ff6b6b;
-    --blue: #4fa8e8;
+    --bg: #F5F0E8;
+    --surface: #EDE8DE;
+    --surface-2: #EAE5DB;
+    --line: rgba(0,0,0,0.12);
+    --text: #1A1E26;
+    --text-dim: #6A7888;
+    --amber: #9A7000;
+    --amber-dim: #C7B37A;
+    --orange: #C06010;
+    --green: #1A8040;
+    --red: #C03030;
+    --blue: #1A6EBF;
+    /* カメラ撮影画面（常にダーク）専用の高視認性アクセント */
+    --cam-amber: #ffb347;
+    --cam-green: #6fcf57;
+    --cam-red: #ff6b6b;
+    --cam-blue: #4fa8e8;
   }
   *{ box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
   html,body{ margin:0; padding:0; background:var(--bg); color:var(--text);
     font-family:'Zen Kaku Gothic New', system-ui, -apple-system, sans-serif; }
   .mono{ font-family:'JetBrains Mono', ui-monospace, monospace; }
 
-  .wrap{ max-width:520px; margin:0 auto; padding:0 0 48px; min-height:100dvh; }
+  .wrap{ max-width:520px; margin:0 auto; padding:0 0 calc(84px + env(safe-area-inset-bottom, 0px)); min-height:100dvh; }
 
-  header{ padding:20px 20px 16px; border-bottom:1px solid var(--line);
-    position:sticky; top:0; background:rgba(20,23,26,0.92); backdrop-filter: blur(6px); z-index:20; }
-  header .eyebrow{ font-size:11px; letter-spacing:.14em; color:var(--amber); font-weight:700; }
-  header h1{ margin:4px 0 2px; font-size:22px; font-weight:900; letter-spacing:.01em; }
-  header .sub{ font-size:12px; color:var(--text-dim); }
+  header{ padding:16px 20px 14px; border-bottom:1px solid var(--line);
+    position:sticky; top:0; background:rgba(245,240,232,0.92); backdrop-filter: blur(6px); z-index:20; }
+  header .header-actions{ position:absolute; top:14px; right:20px; display:flex; gap:6px; }
+  header .header-actions a{ font-size:10.5px; font-weight:700; text-decoration:none;
+    border-radius:12px; padding:5px 10px; white-space:nowrap; }
+  header .help-link{ color:var(--amber); border:1px solid rgba(154,112,0,.3); background:rgba(154,112,0,.08); }
+  header .feedback-link{ color:var(--blue); border:1px solid rgba(26,110,191,.3); background:rgba(26,110,191,.08); }
+  header .header-actions a:active{ opacity:.6; }
+  header .header-row{ display:flex; align-items:baseline; gap:9px; flex-wrap:wrap; padding-right:130px; }
+  header h1{ margin:0; font-size:22px; font-weight:900; letter-spacing:.01em; }
+  header .sub{ font-size:11.5px; color:var(--text-dim); }
+
+  /* 画面下部に常時表示する固定アクションバー */
+  .action-footer{ position:fixed; left:0; right:0; bottom:0; z-index:900;
+    max-width:520px; margin:0 auto; display:flex; gap:10px;
+    padding:10px 20px calc(10px + env(safe-area-inset-bottom, 0px));
+    background:rgba(245,240,232,0.96); backdrop-filter: blur(8px); border-top:1px solid var(--line); }
+  .footer-btn{ flex:1; text-align:center; border:none; border-radius:8px; padding:13px 8px; font-size:13.5px;
+    font-weight:700; cursor:pointer; font-family:inherit; text-decoration:none; display:block; }
+  .footer-btn:active{ transform: scale(0.97); }
+  .footer-btn-save{ background:var(--blue); color:#fff; flex:2.2; }
+  .footer-btn-clear{ background:rgba(192,48,48,.08); color:var(--red); border:1px solid rgba(192,48,48,.3); }
+  .footer-btn-clear:disabled{ opacity:.35; cursor:not-allowed; }
+  .footer-btn-disabled{ opacity:.35; pointer-events:none; }
 
   /* 初期設定バナー */
   .setup-banner{ margin:14px 20px 0; border:1px solid var(--amber-dim); border-radius:6px;
@@ -58,7 +82,7 @@
 
   .readout{ min-height:64px; padding:16px 14px; font-size:16px; line-height:1.55; color:var(--amber);
     background:
-      repeating-linear-gradient(transparent, transparent 27px, rgba(255,179,71,0.04) 28px);
+      repeating-linear-gradient(transparent, transparent 27px, rgba(154,112,0,0.05) 28px);
   }
   .readout .placeholder{ color:var(--amber-dim); }
   .cursor{ display:inline-block; width:7px; height:16px; background:var(--amber); margin-left:2px;
@@ -76,6 +100,12 @@
   .badge.pending{ color:var(--blue); background:rgba(79,168,232,0.08); border-color:rgba(79,168,232,0.3); }
   .no-photo{ font-size:12px; color:var(--text-dim); padding:14px; border-top:1px solid var(--line); }
 
+  /* カメラ撮影画面(常にダーク)専用のバッジ配色。明るいテーマの影響を受けないよう独立させる */
+  #cameraStatus .badge{ background:rgba(0,0,0,.55); backdrop-filter:blur(2px); border:1px solid rgba(255,255,255,.18); }
+  #cameraStatus .badge.ok{ color:var(--cam-green); }
+  #cameraStatus .badge.warn{ color:var(--cam-red); }
+  #cameraStatus .badge.pending{ color:var(--cam-blue); }
+
   .controls{ display:flex; gap:10px; padding:16px 20px 0; }
   .btn{ flex:1; border:none; border-radius:6px; padding:16px 10px; font-size:14px; font-weight:700;
     display:flex; flex-direction:column; align-items:center; gap:6px; cursor:pointer; font-family:inherit;
@@ -84,7 +114,7 @@
   .btn:disabled{ opacity:.35; pointer-events:none; }
   .btn-icon{ font-size:20px; line-height:1; }
   .btn-photo{ background:var(--surface-2); color:var(--text); border:1px solid var(--line); }
-  .btn-mic{ background:var(--orange); color:#1a0e08; }
+  .btn-mic{ background:var(--orange); color:#fff; }
   .btn-mic.recording{ background:var(--red); color:#fff; }
 
   .parsed{ margin:16px 20px 0; border:1px solid var(--line); border-radius:6px; background:var(--surface); display:none; }
@@ -97,20 +127,20 @@
   .field input{ width:100%; background:var(--surface-2); border:1px solid var(--line); border-radius:4px;
     color:var(--text); padding:9px 10px; font-size:14px; font-family:inherit; }
   .field input:focus{ outline:none; border-color:var(--amber); }
+  /* メモ欄を主役に：識別子・数値より一段目立たせる */
+  .field.field-primary{ background:rgba(154,112,0,0.05); }
+  .field.field-primary label{ color:var(--text); font-size:11px; }
+  .field.field-primary input{ font-weight:700; font-size:15px; }
   .save-row{ display:flex; gap:10px; padding:14px; }
-  .btn-save{ background:var(--green); color:#0e1a08; flex:2; }
+  .btn-save{ background:var(--green); color:#fff; flex:2; }
   .btn-retry{ background:var(--surface-2); color:var(--text); border:1px solid var(--line); flex:1; }
 
   .section-title{ margin:28px 20px 4px; font-size:11px; letter-spacing:.12em; color:var(--text-dim); font-weight:700;
     display:flex; justify-content:space-between; align-items:center; }
   .section-title .count{ color:var(--amber); }
-  .export-row{ margin:8px 20px 0; display:flex; gap:8px; }
-  .export-link{ font-size:11px; color:var(--amber); text-decoration:none; font-weight:700; letter-spacing:.02em;
-    border:1px solid var(--line); padding:6px 10px; border-radius:4px; background:var(--surface); flex:1; text-align:center; }
-  .export-link:active{ opacity:.6; }
   .export-note{ margin:6px 20px 0; font-size:10.5px; color:var(--text-dim); }
 
-  .entry{ margin:0 20px 10px; border:1px solid var(--line); border-radius:6px; background:var(--surface); overflow:hidden; }
+  .entry{ margin:0 20px 10px; border:1px solid var(--line); border-left:3px solid var(--orange); border-radius:6px; background:var(--surface); overflow:hidden; }
   .entry-top{ display:flex; gap:10px; padding:12px 14px; }
   .entry-thumb{ width:46px; height:46px; border-radius:4px; object-fit:cover; border:1px solid var(--line); flex-shrink:0; background:#000; }
   .entry-fields{ flex:1; min-width:0; }
@@ -137,9 +167,15 @@
 <div class="wrap">
 
   <header>
-    <div class="eyebrow">FIELD VOICE MEMO — BETA TEST BUILD v3</div>
-    <h1>しゃべメモ β</h1>
-    <div class="sub">撮って→喋る。GPS・方角の自動取得つき</div>
+    <div class="header-actions">
+      <a class="help-link" id="btnHelp" href="#">❓ 使い方</a>
+      <a class="feedback-link" id="btnFeedback"
+         href="mailto:syamemo.info@gmail.com?subject=%E3%81%97%E3%82%83%E3%81%B9%E3%83%A1%E3%83%A2%20%E3%83%95%E3%82%A3%E3%83%BC%E3%83%89%E3%83%90%E3%83%83%E3%82%AF&amp;body=%E2%96%A0%E4%BD%BF%E7%94%A8%E7%AB%AF%E6%9C%AB%EF%BC%88%E4%BE%8B%EF%BC%9AiPhone%2015%20/%20Android%20Pixel%208%20%E3%81%AA%E3%81%A9%EF%BC%89%EF%BC%9A%0A%0A%0A%E2%96%A0%E3%81%94%E6%84%8F%E8%A6%8B%E3%83%BB%E4%B8%8D%E5%85%B7%E5%90%88%E3%83%BB%E8%A6%81%E6%9C%9B%E3%81%AA%E3%81%A9%EF%BC%9A%0A%0A%0A%0A%EF%BC%88%E3%81%93%E3%81%AE%E3%81%BE%E3%81%BE%E9%80%81%E4%BF%A1%E3%81%97%E3%81%A6%E3%81%84%E3%81%9F%E3%81%A0%E3%81%84%E3%81%A6%E6%A7%8B%E3%81%84%E3%81%BE%E3%81%9B%E3%82%93%E3%80%82%E3%81%94%E5%8D%94%E5%8A%9B%E3%81%82%E3%82%8A%E3%81%8C%E3%81%A8%E3%81%86%E3%81%94%E3%81%96%E3%81%84%E3%81%BE%E3%81%99%EF%BC%81%EF%BC%89">✉️ ご意見</a>
+    </div>
+    <div class="header-row">
+      <h1>しゃべメモ（テスト版）</h1>
+      <div class="sub">撮って→喋る。GPS・方角の自動取得つき</div>
+    </div>
   </header>
 
   <div class="setup-banner" id="setupBanner">
@@ -189,7 +225,7 @@
     <div id="cameraStatus" class="mono" style="position:absolute; top:10px; left:10px; right:10px; display:flex; gap:6px; flex-wrap:wrap; z-index:2;"></div>
     <div style="flex-shrink:0; background:#0c0e10; padding:10px 16px calc(10px + env(safe-area-inset-bottom, 0px)); display:flex; align-items:center; justify-content:space-between;">
       <button id="btnCameraCancel" style="background:none; border:1px solid var(--line); color:var(--text); border-radius:20px; padding:8px 14px; font-size:13px; font-family:inherit; flex-shrink:0;">閉じる</button>
-      <button id="btnCameraShutter" style="width:56px; height:56px; border-radius:50%; background:#fff; border:4px solid var(--amber); flex-shrink:0;"></button>
+      <button id="btnCameraShutter" style="width:56px; height:56px; border-radius:50%; background:#fff; border:4px solid var(--cam-amber); flex-shrink:0;"></button>
       <div style="width:60px; flex-shrink:0;"></div>
     </div>
   </div>
@@ -219,8 +255,8 @@
       <label>数値・状態</label>
       <input type="text" id="fNum" placeholder="例）0.3mm / 150枚">
     </div>
-    <div class="field">
-      <label>メモ</label>
+    <div class="field field-primary">
+      <label>メモ（主役の項目です）</label>
       <input type="text" id="fMemo" placeholder="例）ひび割れ">
     </div>
     <div class="field">
@@ -236,15 +272,47 @@
   <div class="section-title">
     <span>記録ログ <span class="count" id="entryCount">(0)</span></span>
   </div>
-  <div class="export-row">
-    <a href="#" class="export-link" id="btnExportZip" style="background:rgba(79,168,232,0.08); border-color:rgba(79,168,232,0.3); color:var(--blue);">📦 写真をZIPで書き出す</a>
-  </div>
-  <div class="export-note">写真ファイルそのものにGPS・方角・メモを書き込み、標準的なJPEGとしてZIPにまとめます。写メモdeMAPの「写真を読み込む」で（展開後）そのまま読み込めます。記録は端末内(ブラウザ)に自動保存され、次回起動時も残ります。</div>
+  <div class="export-note">📌 保存・クリアは画面下部のボタンからいつでも操作できます。詳しい手順は右上の「❓ 使い方」をご覧ください。</div>
 
   <div id="entryList" style="margin-top:14px;">
     <div class="empty" id="emptyMsg">まだ記録がありません</div>
   </div>
 
+</div>
+
+<!-- 画面下部に常時表示される固定アクションバー -->
+<div class="action-footer" id="actionFooter">
+  <a href="#" class="footer-btn footer-btn-save" id="btnExportZip">💾 データを保存する</a>
+  <button class="footer-btn footer-btn-clear" id="btnClearAll" disabled>🗑 クリア</button>
+</div>
+
+<!-- 使い方ガイドモーダル -->
+<div id="helpModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:1500; align-items:center; justify-content:center; padding:20px;">
+  <div style="background:var(--surface); border:1px solid var(--line); border-radius:10px; max-width:440px; width:100%; max-height:85vh; overflow-y:auto;">
+    <div style="padding:16px 18px 4px; font-size:16px; font-weight:900;">❓ 使い方・保存の流れ</div>
+    <div style="padding:8px 18px 4px; font-size:13px; line-height:1.8;">
+      <div style="margin-bottom:14px;">
+        <div style="font-weight:700; color:var(--orange); margin-bottom:3px;">① 撮る・喋る</div>
+        <div style="color:var(--text-dim);">「写真を撮る」「メモを喋る」で現場のデータを記録します。写真は任意です（音声メモのみでも記録できます）。</div>
+      </div>
+      <div style="margin-bottom:14px;">
+        <div style="font-weight:700; color:var(--orange); margin-bottom:3px;">② 保存する</div>
+        <div style="color:var(--text-dim);">現場での作業が一区切りついたら、画面下部の「💾 データを保存する」を押してください。<b style="color:var(--text);">これを押すまでは、記録はこのスマホの中にしか残りません。</b></div>
+      </div>
+      <div style="margin-bottom:14px;">
+        <div style="font-weight:700; color:var(--orange); margin-bottom:3px;">③ 送る（推奨：Googleドライブ）</div>
+        <div style="color:var(--text-dim);">保存を押すと、対応端末では共有メニューが自動で開きます。<b style="color:var(--text);">「Googleドライブ」を選ぶと、そのままクラウドに保存されPCからも見られる</b ようになるためおすすめです。共有メニューが出ない場合は、スマホの「ファイル」アプリのダウンロードフォルダから手動でGoogleドライブアプリにアップロードしてください。</div>
+      </div>
+      <div style="margin-bottom:4px;">
+        <div style="font-weight:700; color:var(--orange); margin-bottom:3px;">④ PCで開く</div>
+        <div style="color:var(--text-dim);">PC側で「写メモdeMAP」を開き、Googleドライブから保存したZIPファイルを展開してから「写真を読み込む」で読み込めば完了です。</div>
+      </div>
+    </div>
+    <div style="padding:0 18px 14px; font-size:11px; color:var(--text-dim); border-top:1px dashed var(--line); margin-top:6px; padding-top:10px;">
+      🗑 「クリア」は撮影データをすべて削除します。<b style="color:var(--text);">保存（書き出し）前に押すとデータが失われる</b>のでご注意ください。
+    </div>
+    <button id="btnHelpClose" style="width:100%; padding:14px; background:var(--surface-2); border:none; border-top:1px solid var(--line); color:var(--text); font-size:13px; font-weight:700; font-family:inherit; cursor:pointer;">閉じる</button>
+  </div>
 </div>
 
 <script>
@@ -292,6 +360,10 @@
   const emptyMsg = $('emptyMsg');
   const entryCount = $('entryCount');
   const btnExportZip = $('btnExportZip');
+  const btnClearAll = $('btnClearAll');
+  const btnHelp = $('btnHelp');
+  const helpModal = $('helpModal');
+  const btnHelpClose = $('btnHelpClose');
 
   let pendingPhoto = null; // {blob, url, name, time, lat, lng, alt, dir, geoSource}
   let currentRawText = '';
@@ -306,6 +378,14 @@
     localStorage.setItem('shabememo_setup_done', '1');
     setupBanner.classList.remove('show');
   });
+
+  // ---- 使い方ガイドモーダル ----
+  btnHelp.addEventListener('click', (e) => {
+    e.preventDefault();
+    helpModal.style.display = 'flex';
+  });
+  btnHelpClose.addEventListener('click', () => { helpModal.style.display = 'none'; });
+  helpModal.addEventListener('click', (e) => { if (e.target === helpModal) helpModal.style.display = 'none'; });
 
   // ---- IndexedDB ----
   let db = null;
@@ -790,6 +870,8 @@
 
   function renderEntries(){
     entryCount.textContent = '(' + entries.length + ')';
+    btnClearAll.disabled = entries.length === 0;
+    btnExportZip.classList.toggle('footer-btn-disabled', entries.length === 0);
     if (entries.length === 0) {
       entryList.innerHTML = '';
       entryList.appendChild(emptyMsg);
@@ -1016,16 +1098,57 @@
     }
 
     const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
-    const url = URL.createObjectURL(zipBlob);
-    const a = document.createElement('a');
-    a.href = url; a.download = 'shabememo_photos_' + new Date().toISOString().slice(0,10) + '.zip';
-    a.click();
-    URL.revokeObjectURL(url);
+    const zipFileName = 'shabememo_photos_' + new Date().toISOString().slice(0,10) + '.zip';
+
+    // 対応端末（多くのAndroid Chrome / iOS Safari）では共有シートを直接開き、
+    // Googleドライブ・LINE・メール等へワンタップで送れるようにする
+    let shared = false;
+    try {
+      const zipFile = new File([zipBlob], zipFileName, { type: 'application/zip' });
+      if (navigator.canShare && navigator.canShare({ files: [zipFile] })) {
+        await navigator.share({
+          files: [zipFile],
+          title: 'しゃべメモ 撮影データ',
+          text: 'しゃべメモで記録した撮影データです。Googleドライブ等に保存してください。'
+        });
+        shared = true;
+      }
+    } catch (err) {
+      // ユーザーが共有をキャンセルした場合(AbortError)は成功扱いにする(再度ダウンロードしない)
+      if (err && err.name === 'AbortError') { shared = true; }
+    }
+
+    if (!shared) {
+      // 共有APIが使えない環境(PC等)は、従来通りダウンロードする
+      const url = URL.createObjectURL(zipBlob);
+      const a = document.createElement('a');
+      a.href = url; a.download = zipFileName;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
     let msg = `${okCount}件を書き出しました`;
     if (placeholderCount > 0) msg += `（うち音声のみ${placeholderCount}件はマーカー画像で代用）`;
     if (skipCount > 0) msg += `／位置情報のない記録${skipCount}件はスキップ`;
     alert(msg);
   });
+
+  // ---- 撮影データを全クリア ----
+  async function clearAllEntries(){
+    if (entries.length === 0) return;
+    const ok = confirm(
+      `記録${entries.length}件をすべて削除します。\n` +
+      `まだ「データを保存する」でZIPに書き出していない記録は失われます。\n` +
+      `よろしいですか？`
+    );
+    if (!ok) return;
+    for (const en of entries) {
+      await idbDelete(en.id);
+    }
+    entries = [];
+    renderEntries();
+  }
+  btnClearAll.addEventListener('click', clearAllEntries);
 
   function escapeHtml(str){
     return String(str)
