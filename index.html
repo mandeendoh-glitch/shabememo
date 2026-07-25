@@ -161,6 +161,42 @@
   @media (orientation: landscape) {
     #cameraVideo { object-fit: contain !important; }
   }
+
+  /* ── 撮影確認画面（openReview）── */
+  .review-close{ position:absolute; top:12px; right:12px; z-index:1200; width:34px; height:34px; border-radius:50%;
+    background:rgba(0,0,0,.55); color:#fff; border:1px solid rgba(255,255,255,.3); font-size:16px; cursor:pointer; line-height:1; }
+  .review-wrap{ display:flex; flex-direction:column; height:100%; }
+  .review-photo{ position:relative; background:#000; flex:1 1 52%; min-height:0; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+  .review-photo img{ width:100%; height:100%; object-fit:contain; display:block; }
+  .review-geo-badges{ position:absolute; top:10px; left:10px; display:flex; gap:6px; flex-wrap:wrap; z-index:2; }
+  .review-panel{ flex:1 1 48%; min-height:0; background:#14171a; padding:16px 18px calc(16px + env(safe-area-inset-bottom, 0px));
+    display:flex; flex-direction:column; overflow-y:auto; }
+  .rev-phase{ display:flex; flex-direction:column; gap:10px; flex:1; min-height:0; }
+  .rev-phase-title{ font-size:13.5px; font-weight:700; color:#f2efe9; }
+  .rev-btn{ border:none; border-radius:8px; padding:14px 10px; font-size:14px; font-weight:700; cursor:pointer; font-family:inherit; }
+  .rev-btn:active{ transform: scale(0.97); }
+  .rev-btn-primary{ background:#C06010; color:#fff; }
+  .rev-btn-accent{ background:#1A6EBF; color:#fff; }
+  .rev-btn-ghost{ background:rgba(255,255,255,.08); color:#f2efe9; border:1px solid rgba(255,255,255,.2); }
+  .rev-btn-small{ padding:9px 10px; font-size:12px; flex-shrink:0; }
+  .rev-readout{ flex:1; min-height:64px; font-size:15px; line-height:1.6; color:#ffb347;
+    background:rgba(255,255,255,.05); border-radius:6px; padding:12px; }
+  .rev-fields{ display:flex; flex-direction:column; gap:8px; }
+  .rev-field label{ display:block; font-size:10.5px; color:#ffb347; margin-bottom:4px; font-weight:700; }
+  .rev-field input{ width:100%; background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.2); border-radius:4px;
+    color:#f2efe9; padding:9px 10px; font-size:14px; font-family:inherit; }
+  .rev-field input:focus{ outline:none; border-color:#ffb347; }
+  .rev-field-primary input{ font-weight:700; font-size:15px; }
+  .rev-status-note{ font-size:12px; color:#8b9096; line-height:1.6; }
+  .rev-final-row{ display:flex; gap:8px; margin-top:auto; }
+  .rev-final-row .rev-btn{ flex:1; }
+
+  /* 横向き端末：写真を左2/3、操作パネルを右1/3に配置（建設・不動産の横長撮影が基本のため） */
+  @media (orientation: landscape) {
+    .review-wrap{ flex-direction:row; }
+    .review-photo{ flex:2 1 0; }
+    .review-panel{ flex:1 1 0; max-width:38%; padding-bottom:16px; }
+  }
 </style>
 </head>
 <body>
@@ -230,6 +266,54 @@
     </div>
   </div>
   <canvas id="captureCanvas" style="display:none;"></canvas>
+
+  <!-- 撮影直後の確認画面：写真を大きく確認しながら、その場でメモを追加・保存できる -->
+  <div id="reviewModal" style="display:none; position:fixed; inset:0; height:100svh; background:#000; z-index:1100;">
+    <button id="reviewBtnClose" class="review-close" title="この写真を破棄して閉じる">✕</button>
+    <div class="review-wrap" id="reviewWrap">
+      <div class="review-photo">
+        <img id="reviewImg" alt="撮影確認">
+        <div class="review-geo-badges mono" id="reviewGeoBadges"></div>
+      </div>
+      <div class="review-panel">
+        <!-- フェーズ①：メモを喋るか選ぶ -->
+        <div id="revChoice" class="rev-phase">
+          <div class="rev-phase-title">この写真にメモを追加しますか？</div>
+          <button id="revBtnSpeak" class="rev-btn rev-btn-primary">🎙️ メモを喋る</button>
+          <button id="revBtnSkip" class="rev-btn rev-btn-ghost">✋ メモは不要</button>
+        </div>
+        <!-- フェーズ②：聞き取り中 -->
+        <div id="revListening" class="rev-phase" style="display:none;">
+          <div class="rev-phase-title">🎙️ 聞き取り中…</div>
+          <div class="rev-readout mono" id="revReadout"><span class="cursor"></span></div>
+          <button id="revBtnStop" class="rev-btn rev-btn-ghost">⏹ 終了する</button>
+        </div>
+        <!-- フェーズ③：確認・保存 -->
+        <div id="revFinal" class="rev-phase" style="display:none;">
+          <div class="rev-fields" id="revFields">
+            <div class="rev-field">
+              <label>識別子</label>
+              <input type="text" id="revIdent" placeholder="例）0023 / エリアA">
+            </div>
+            <div class="rev-field">
+              <label>数値・状態</label>
+              <input type="text" id="revNum" placeholder="例）0.3mm / 150枚">
+            </div>
+            <div class="rev-field rev-field-primary">
+              <label>メモ</label>
+              <input type="text" id="revMemo" placeholder="例）ひび割れ">
+            </div>
+          </div>
+          <div class="rev-status-note" id="revStatusNote" style="display:none;"></div>
+          <button id="revBtnRetry" class="rev-btn rev-btn-ghost rev-btn-small">🔄 もう一度しゃべる</button>
+          <div class="rev-final-row">
+            <button id="revBtnOK" class="rev-btn rev-btn-primary">✓ OK</button>
+            <button id="revBtnContinue" class="rev-btn rev-btn-accent">📷 撮影を続ける</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- 撮影データ詳細ポップアップ -->
   <div id="detailModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.75); z-index:1000; align-items:center; justify-content:center; padding:20px;">
@@ -365,8 +449,29 @@
   const helpModal = $('helpModal');
   const btnHelpClose = $('btnHelpClose');
 
+  // ---- 撮影確認画面(レビュー)の要素 ----
+  const reviewModal = $('reviewModal');
+  const reviewBtnClose = $('reviewBtnClose');
+  const reviewImg = $('reviewImg');
+  const reviewGeoBadges = $('reviewGeoBadges');
+  const revChoice = $('revChoice');
+  const revListening = $('revListening');
+  const revFinal = $('revFinal');
+  const revReadout = $('revReadout');
+  const revBtnSpeak = $('revBtnSpeak');
+  const revBtnSkip = $('revBtnSkip');
+  const revBtnStop = $('revBtnStop');
+  const revBtnRetry = $('revBtnRetry');
+  const revBtnOK = $('revBtnOK');
+  const revBtnContinue = $('revBtnContinue');
+  const revFields = $('revFields');
+  const revIdent = $('revIdent'), revNum = $('revNum'), revMemo = $('revMemo');
+  const revStatusNote = $('revStatusNote');
+
   let pendingPhoto = null; // {blob, url, name, time, lat, lng, alt, dir, geoSource}
   let currentRawText = '';
+  let reviewRawText = '';
+  let recognitionContext = 'home'; // 'home' | 'review' — 音声認識の結果をどちらのUIに反映するか
   let entries = [];
   let recognizing = false;
 
@@ -486,18 +591,19 @@
     };
   }
 
-  function renderGeoBadges(p){
-    geoBadges.innerHTML = '';
+  function renderGeoBadges(p, targetEl){
+    targetEl = targetEl || geoBadges;
+    targetEl.innerHTML = '';
     if (p.lat !== null && p.lng !== null) {
       const srcLabel = { device: '(内蔵カメラ)', browser: '(端末位置情報)', exif: '(写真EXIF)' }[p.geoSource] || '';
-      geoBadges.innerHTML += `<span class="badge ok">📍 GPS取得済み ${srcLabel}</span>`;
+      targetEl.innerHTML += `<span class="badge ok">📍 GPS取得済み ${srcLabel}</span>`;
     } else {
-      geoBadges.innerHTML += `<span class="badge warn">📍 GPSなし</span>`;
+      targetEl.innerHTML += `<span class="badge warn">📍 GPSなし</span>`;
     }
     if (p.dir !== null) {
-      geoBadges.innerHTML += `<span class="badge ok">🧭 ${p.dir.toFixed(0)}°（${dirName(p.dir)}）</span>`;
+      targetEl.innerHTML += `<span class="badge ok">🧭 ${p.dir.toFixed(0)}°（${dirName(p.dir)}）</span>`;
     } else {
-      geoBadges.innerHTML += `<span class="badge warn">🧭 方角なし</span>`;
+      targetEl.innerHTML += `<span class="badge warn">🧭 方角なし</span>`;
     }
   }
 
@@ -651,7 +757,7 @@
       if (!blob) return;
       const capturedGeo = latestGeo, capturedHeading = circularMeanDeg(headingBuffer);
       closeCamera();
-      onPhotoCaptured(blob, capturedGeo, capturedHeading, 'device');
+      openReview(blob, capturedGeo, capturedHeading, 'device');
     }, 'image/jpeg', 0.85);
   });
 
@@ -659,7 +765,7 @@
   cameraInputFallback.addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    onPhotoCaptured(file, null, null, 'fallback_pending');
+    openReview(file, null, null, 'fallback_pending');
     // フォールバック時はEXIF読取＋ブラウザ位置情報で補完
     try {
       const buf = await file.arrayBuffer();
@@ -668,20 +774,21 @@
         pendingPhoto.lat = exif.lat; pendingPhoto.lng = exif.lng;
         pendingPhoto.alt = exif.alt; pendingPhoto.dir = exif.dir;
         pendingPhoto.geoSource = 'exif';
-        renderGeoBadges(pendingPhoto);
+        renderGeoBadges(pendingPhoto, reviewGeoBadges);
         return;
       }
     } catch(err){}
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (pos) => { if (pendingPhoto) { pendingPhoto.lat = pos.coords.latitude; pendingPhoto.lng = pos.coords.longitude; pendingPhoto.alt = pos.coords.altitude; pendingPhoto.geoSource = 'browser'; renderGeoBadges(pendingPhoto); } },
-        () => { if (pendingPhoto) renderGeoBadges(pendingPhoto); }
+        (pos) => { if (pendingPhoto) { pendingPhoto.lat = pos.coords.latitude; pendingPhoto.lng = pos.coords.longitude; pendingPhoto.alt = pos.coords.altitude; pendingPhoto.geoSource = 'browser'; renderGeoBadges(pendingPhoto, reviewGeoBadges); } },
+        () => { if (pendingPhoto) renderGeoBadges(pendingPhoto, reviewGeoBadges); }
       );
     }
     cameraInputFallback.value = '';
   });
 
-  function onPhotoCaptured(blob, geo, heading, source){
+  // ---- 撮影確認画面（写真を大きく確認しながら、その場でメモ追加・保存まで完結させる）----
+  function buildPendingPhoto(blob, geo, heading, source){
     const url = URL.createObjectURL(blob);
     const now = new Date();
     pendingPhoto = {
@@ -694,16 +801,82 @@
       dir: heading,
       geoSource: source
     };
-    photoThumb.src = url;
-    photoName.textContent = pendingPhoto.name;
-    photoTime.textContent = pendingPhoto.time;
-    renderGeoBadges(pendingPhoto);
-    photoRow.style.display = 'flex';
-    noPhotoMsg.style.display = 'none';
-    btnMic.disabled = false;
-    readout.innerHTML = '<span class="placeholder">マイクボタンを押して喋ってください…</span>';
-    parsedBox.classList.remove('show');
   }
+
+  function showRevPhase(phase){
+    revChoice.style.display = phase === 'choice' ? 'flex' : 'none';
+    revListening.style.display = phase === 'listening' ? 'flex' : 'none';
+    revFinal.style.display = phase === 'final' ? 'flex' : 'none';
+  }
+
+  function openReview(blob, geo, heading, source){
+    buildPendingPhoto(blob, geo, heading, source);
+    reviewImg.src = pendingPhoto.url;
+    renderGeoBadges(pendingPhoto, reviewGeoBadges);
+    revStatusNote.style.display = 'none';
+    showRevPhase('choice');
+    reviewModal.style.display = 'block';
+  }
+
+  reviewBtnClose.addEventListener('click', () => {
+    if (!confirm('撮影した写真を破棄します。よろしいですか？')) return;
+    if (recognizing && recognitionContext === 'review') { try { recognition.stop(); } catch(e){} }
+    reviewModal.style.display = 'none';
+    if (pendingPhoto && pendingPhoto.url) URL.revokeObjectURL(pendingPhoto.url);
+    pendingPhoto = null;
+  });
+
+  function startReviewRecognition(){
+    if (!recognition) { alert('この端末・ブラウザは音声認識に対応していません。'); return; }
+    recognitionContext = 'review';
+    reviewRawText = '';
+    showRevPhase('listening');
+    revReadout.innerHTML = '<span class="cursor"></span>';
+    try { recognition.start(); } catch(e) {}
+  }
+  revBtnSpeak.addEventListener('click', startReviewRecognition);
+  revBtnRetry.addEventListener('click', startReviewRecognition);
+  revBtnStop.addEventListener('click', () => { if (recognizing) recognition.stop(); });
+
+  revBtnSkip.addEventListener('click', () => {
+    revIdent.value = ''; revNum.value = ''; revMemo.value = ''; reviewRawText = '';
+    revFields.style.display = 'none';
+    revStatusNote.textContent = 'メモなしで保存します。';
+    revStatusNote.style.display = 'block';
+    showRevPhase('final');
+  });
+
+  function finishReviewWithText(raw){
+    const p = parseSpeech(raw);
+    revIdent.value = p.ident; revNum.value = p.numStatus; revMemo.value = p.memo;
+    revFields.style.display = 'flex';
+    revStatusNote.style.display = 'none';
+    showRevPhase('final');
+  }
+
+  async function saveReviewEntry(andContinue){
+    if (!pendingPhoto) return;
+    const entry = {
+      id: Date.now(),
+      photoBlob: pendingPhoto.blob,
+      photoName: pendingPhoto.name,
+      time: pendingPhoto.time,
+      lat: pendingPhoto.lat, lng: pendingPhoto.lng, alt: pendingPhoto.alt, dir: pendingPhoto.dir,
+      geoSource: pendingPhoto.geoSource,
+      ident: revIdent.value.trim(),
+      numStatus: revNum.value.trim(),
+      memo: revMemo.value.trim(),
+      raw: reviewRawText || ''
+    };
+    entries.unshift(entry);
+    await idbSave(entry);
+    renderEntries();
+    pendingPhoto = null;
+    reviewModal.style.display = 'none';
+    if (andContinue) { openCamera(); }
+  }
+  revBtnOK.addEventListener('click', () => saveReviewEntry(false));
+  revBtnContinue.addEventListener('click', () => saveReviewEntry(true));
 
   // ---- 音声認識 ----
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -718,6 +891,7 @@
 
     recognition.onstart = () => {
       recognizing = true;
+      if (recognitionContext === 'review') return; // レビュー画面は静的な「聞き取り中」表示のみで良い
       btnMic.classList.add('recording');
       micLabel.textContent = '認識中…（タップで終了）';
       recDot.classList.add('live');
@@ -733,16 +907,44 @@
       }
       const combined = final + interim;
       currentRawText = final || combined;
-      readout.innerHTML = escapeHtml(combined) + '<span class="cursor"></span>';
+      if (recognitionContext === 'review') {
+        reviewRawText = currentRawText;
+        revReadout.innerHTML = escapeHtml(combined) + '<span class="cursor"></span>';
+      } else {
+        readout.innerHTML = escapeHtml(combined) + '<span class="cursor"></span>';
+      }
     };
 
     recognition.onerror = (event) => {
+      if (recognitionContext === 'review') {
+        stopRecognitionUI();
+        revIdent.value = ''; revNum.value = ''; revMemo.value = '';
+        revFields.style.display = 'none';
+        revStatusNote.textContent = '認識エラー（' + event.error + '）が発生しました。「🔄 もう一度しゃべる」でやり直せます。';
+        revStatusNote.style.display = 'block';
+        showRevPhase('final');
+        recognitionContext = 'home';
+        return;
+      }
       readout.innerHTML = '<span class="placeholder">認識エラー（' + event.error + '）。もう一度お試しください。</span>';
       stopRecognitionUI();
     };
 
     recognition.onend = () => {
       stopRecognitionUI();
+      if (recognitionContext === 'review') {
+        if (reviewRawText && reviewRawText.trim()) {
+          finishReviewWithText(reviewRawText.trim());
+        } else {
+          revIdent.value = ''; revNum.value = ''; revMemo.value = '';
+          revFields.style.display = 'none';
+          revStatusNote.textContent = '聞き取れませんでした。「🔄 もう一度しゃべる」で再挑戦するか、このまま保存できます。';
+          revStatusNote.style.display = 'block';
+          showRevPhase('final');
+        }
+        recognitionContext = 'home';
+        return;
+      }
       if (currentRawText && currentRawText.trim()) {
         readout.innerHTML = escapeHtml(currentRawText);
         openParsed(currentRawText.trim());
@@ -764,6 +966,7 @@
   btnMic.addEventListener('click', () => {
     if (!recognition) return;
     if (recognizing) { recognition.stop(); return; }
+    recognitionContext = 'home';
     currentRawText = '';
     standaloneGeo = null;
     if (!pendingPhoto && navigator.geolocation) {
