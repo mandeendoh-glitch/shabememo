@@ -656,8 +656,10 @@
     if (event.webkitCompassHeading !== undefined && event.webkitCompassHeading !== null) {
       return event.webkitCompassHeading; // iOS: 真北基準、そのまま使える
     }
-    if (event.alpha !== null && event.alpha !== undefined) {
-      // Android等: absolute な alpha から時計回り方位角へ変換
+    // Android等: alphaは「起動時の向き」を基準にした相対値のことがあり、その場合は方位として使えない。
+    // event.absolute===true(真北基準であることが保証されている)場合だけ採用する。
+    // (deviceorientationabsoluteイベントは常にabsolute=trueだが、deviceorientationはtrue/false/undefinedとまちまちなため)
+    if (event.absolute === true && event.alpha !== null && event.alpha !== undefined) {
       return (360 - event.alpha) % 360;
     }
     return null;
