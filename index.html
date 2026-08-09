@@ -171,6 +171,10 @@
   @media (orientation: landscape) {
     #cameraVideo { object-fit: contain !important; }
   }
+  /* 手動切り替えボタン用：自動判定(上記)が実機で正しく効かない場合の脱出口として、
+     現在の実際の向きに関係なく強制的にフィット方式を指定できるようにする */
+  #cameraModal.force-landscape #cameraVideo{ object-fit: contain !important; }
+  #cameraModal.force-portrait #cameraVideo{ object-fit: cover !important; }
 
   /* ── 撮影確認画面（openReview）── */
   .review-close{ position:absolute; top:12px; right:12px; z-index:1200; width:34px; height:34px; border-radius:50%;
@@ -287,8 +291,9 @@
     <div id="cameraStatus" class="mono" style="position:absolute; top:10px; left:10px; right:10px; display:flex; gap:6px; flex-wrap:wrap; z-index:2;"></div>
     <div style="flex-shrink:0; background:#0c0e10; padding:10px 16px calc(10px + env(safe-area-inset-bottom, 0px)); display:flex; align-items:center; justify-content:space-between;">
       <button id="btnCameraCancel" style="background:none; border:1px solid var(--line); color:var(--text); border-radius:20px; padding:8px 14px; font-size:13px; font-family:inherit; flex-shrink:0;">閉じる</button>
+      <button id="btnCameraOrient" title="表示の向きが実際と違う場合はタップ" style="background:none; border:1px solid var(--line); color:var(--text); border-radius:20px; padding:8px 12px; font-size:16px; font-family:inherit; flex-shrink:0; line-height:1;">⤢</button>
       <button id="btnCameraShutter" style="width:56px; height:56px; border-radius:50%; background:#fff; border:4px solid var(--cam-amber); flex-shrink:0;"></button>
-      <div style="width:60px; flex-shrink:0;"></div>
+      <div style="width:34px; flex-shrink:0;"></div>
     </div>
   </div>
   <canvas id="captureCanvas" style="display:none;"></canvas>
@@ -306,6 +311,7 @@
         <div id="revChoice" class="rev-phase">
           <div class="rev-phase-title">この写真にメモを追加しますか？</div>
           <button id="revBtnSpeak" class="rev-btn rev-btn-primary">🎙️ メモを喋る</button>
+          <button id="revBtnType" class="rev-btn rev-btn-accent">⌨️ 手入力する</button>
           <button id="revBtnSkip" class="rev-btn rev-btn-ghost">✋ メモは不要</button>
         </div>
         <!-- フェーズ②：聞き取り中 -->
@@ -399,6 +405,25 @@
 </div>
 
 <!-- 使い方ガイドモーダル -->
+<div id="projectNameModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:1600; align-items:center; justify-content:center; padding:20px;">
+  <div style="background:var(--surface); border:1px solid var(--line); border-radius:10px; max-width:380px; width:100%;">
+    <div style="padding:16px 18px 4px; font-size:16px; font-weight:900;">💾 データを保存する</div>
+    <div style="padding:8px 18px 4px; font-size:12.5px; color:var(--text-dim); line-height:1.6;">
+      現場名を入力してください。ファイル名に使われ、同じ日に複数回保存しても上書きされません。
+    </div>
+    <div style="padding:8px 18px 4px;">
+      <input type="text" id="projectNameInput" placeholder="例）品川再開発現場" maxlength="40"
+        style="width:100%; background:rgba(255,255,255,.05); border:1px solid var(--line); border-radius:6px;
+        color:var(--text); padding:10px 12px; font-size:14px; font-family:inherit;">
+    </div>
+    <div style="display:flex; gap:8px; padding:14px 18px 18px;">
+      <button id="projectNameCancel" style="flex:1; padding:11px; border-radius:8px; border:1px solid var(--line);
+        background:none; color:var(--text); font-size:13px; font-weight:700; font-family:inherit;">キャンセル</button>
+      <button id="projectNameConfirm" style="flex:1; padding:11px; border-radius:8px; border:none;
+        background:var(--blue); color:#fff; font-size:13px; font-weight:700; font-family:inherit;">保存する</button>
+    </div>
+  </div>
+</div>
 <div id="helpModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:1500; align-items:center; justify-content:center; padding:20px;">
   <div style="background:var(--surface); border:1px solid var(--line); border-radius:10px; max-width:440px; width:100%; max-height:85vh; overflow-y:auto;">
     <div style="padding:16px 18px 4px; font-size:16px; font-weight:900;">❓ 使い方・保存の流れ</div>
@@ -483,6 +508,7 @@
   const cameraVideo = $('cameraVideo');
   const cameraStatus = $('cameraStatus');
   const btnCameraCancel = $('btnCameraCancel');
+  const btnCameraOrient = $('btnCameraOrient');
   const btnCameraShutter = $('btnCameraShutter');
   const captureCanvas = $('captureCanvas');
 
@@ -748,6 +774,7 @@
 
   async function openCamera(){
     latestGeo = null; latestHeading = null; headingBuffer = [];
+    cameraModal.classList.remove('force-landscape','force-portrait'); // 毎回、自動判定からやり直す
 
     sizeCameraModal();
     if (window.visualViewport) window.visualViewport.addEventListener('resize', onViewportResize);
@@ -813,6 +840,17 @@
 
   btnPhoto.addEventListener('click', openCamera);
   btnCameraCancel.addEventListener('click', closeCamera);
+  btnCameraOrient.addEventListener('click', () => {
+    // 自動判定 → 横向き固定 → 縦向き固定 → 自動判定 … の順に切り替える
+    if (cameraModal.classList.contains('force-landscape')) {
+      cameraModal.classList.remove('force-landscape');
+      cameraModal.classList.add('force-portrait');
+    } else if (cameraModal.classList.contains('force-portrait')) {
+      cameraModal.classList.remove('force-portrait');
+    } else {
+      cameraModal.classList.add('force-landscape');
+    }
+  });
 
   btnCameraShutter.addEventListener('click', () => {
     const w = cameraVideo.videoWidth, h = cameraVideo.videoHeight;
@@ -903,6 +941,15 @@
   revBtnSpeak.addEventListener('click', startReviewRecognition);
   revBtnRetry.addEventListener('click', startReviewRecognition);
   revBtnStop.addEventListener('click', () => { if (recognizing) recognition.stop(); });
+
+  const revBtnType = $('revBtnType');
+  revBtnType.addEventListener('click', () => {
+    revIdent.value = ''; revNum.value = ''; revMemo.value = ''; reviewRawText = '';
+    revFields.style.display = 'flex';
+    revStatusNote.style.display = 'none';
+    showRevPhase('final');
+    revMemo.focus(); // 手入力を選んだ意図が明確なので、すぐ入力できるようメモ欄にフォーカスする
+  });
 
   revBtnSkip.addEventListener('click', () => {
     revIdent.value = ''; revNum.value = ''; revMemo.value = ''; reviewRawText = '';
@@ -1297,9 +1344,27 @@
     }
   }
 
-  btnExportZip.addEventListener('click', async (e) => {
+  const projectNameModal = $('projectNameModal');
+  const projectNameInput = $('projectNameInput');
+  const projectNameCancel = $('projectNameCancel');
+  const projectNameConfirm = $('projectNameConfirm');
+
+  btnExportZip.addEventListener('click', (e) => {
     e.preventDefault();
     if (entries.length === 0) { alert('記録がまだありません。'); return; }
+    projectNameInput.value = '';
+    projectNameModal.style.display = 'flex';
+    setTimeout(() => projectNameInput.focus(), 50);
+  });
+  projectNameCancel.addEventListener('click', () => { projectNameModal.style.display = 'none'; });
+  projectNameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') projectNameConfirm.click(); });
+  projectNameConfirm.addEventListener('click', async () => {
+    const projectName = projectNameInput.value.trim() || '未分類';
+    projectNameModal.style.display = 'none';
+    await doExportZip(projectName);
+  });
+
+  async function doExportZip(projectName) {
     try {
       await ensureLibs();
     } catch(err) {
@@ -1367,24 +1432,49 @@
     }
 
     const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
-    const zipFileName = 'shabememo_photos_' + new Date().toISOString().slice(0,10) + '.zip';
+    const now2 = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const dateStr = `${now2.getFullYear()}${pad(now2.getMonth()+1)}${pad(now2.getDate())}`;
+    const timeStr = `${pad(now2.getHours())}${pad(now2.getMinutes())}${pad(now2.getSeconds())}`;
+    const safeProjectName = (projectName || '未分類').replace(/[\\/:*?"<>|]/g, '_'); // ファイル名に使えない記号を除去
+    const zipFileName = `${safeProjectName}_${dateStr}_${timeStr}.zip`;
+
+    // 保存先を選べる場合は最優先で使う（Android Chrome等。フォルダも含めて明示的に選択できる）
+    let saved = false;
+    if (window.showSaveFilePicker) {
+      try {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: zipFileName,
+          types: [{ description: 'ZIPファイル', accept: { 'application/zip': ['.zip'] } }]
+        });
+        const writable = await handle.createWritable();
+        await writable.write(zipBlob);
+        await writable.close();
+        saved = true;
+      } catch (err) {
+        // ユーザーがキャンセルした場合(AbortError)は保存済み扱いにする(再度ダウンロードしない)
+        if (err && err.name === 'AbortError') { saved = true; }
+      }
+    }
 
     // 対応端末（多くのAndroid Chrome / iOS Safari）では共有シートを直接開き、
     // Googleドライブ・LINE・メール等へワンタップで送れるようにする
-    let shared = false;
-    try {
-      const zipFile = new File([zipBlob], zipFileName, { type: 'application/zip' });
-      if (navigator.canShare && navigator.canShare({ files: [zipFile] })) {
-        await navigator.share({
-          files: [zipFile],
-          title: '写メモVoice 撮影データ',
-          text: '写メモVoiceで記録した撮影データです。Googleドライブ等に保存してください。'
-        });
-        shared = true;
+    let shared = saved;
+    if (!saved) {
+      try {
+        const zipFile = new File([zipBlob], zipFileName, { type: 'application/zip' });
+        if (navigator.canShare && navigator.canShare({ files: [zipFile] })) {
+          await navigator.share({
+            files: [zipFile],
+            title: '写メモVoice 撮影データ',
+            text: '写メモVoiceで記録した撮影データです。Googleドライブ等に保存してください。'
+          });
+          shared = true;
+        }
+      } catch (err) {
+        // ユーザーが共有をキャンセルした場合(AbortError)は成功扱いにする(再度ダウンロードしない)
+        if (err && err.name === 'AbortError') { shared = true; }
       }
-    } catch (err) {
-      // ユーザーが共有をキャンセルした場合(AbortError)は成功扱いにする(再度ダウンロードしない)
-      if (err && err.name === 'AbortError') { shared = true; }
     }
 
     if (!shared) {
@@ -1400,7 +1490,7 @@
     if (placeholderCount > 0) msg += `（うち音声のみ${placeholderCount}件はマーカー画像で代用）`;
     if (skipCount > 0) msg += `／位置情報のない記録${skipCount}件はスキップ`;
     alert(msg);
-  });
+  }
 
   // ---- 撮影データを全クリア ----
   async function clearAllEntries(){
