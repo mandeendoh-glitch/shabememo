@@ -172,6 +172,8 @@
   /* 横向きの時は、上下が大きく切れないよう「全体を映す」表示に切り替える */
   @media (orientation: landscape) {
     #cameraVideo { object-fit: contain !important; }
+    #camMiniWidgets{ top:8px; left:auto; right:8px; flex-direction:column; }
+    #camGpsWarn{ bottom:auto; top:8px; left:8px; right:90px; }
   }
   /* 手動切り替えボタン用：自動判定(上記)が実機で正しく効かない場合の脱出口として、
      現在の実際の向きに関係なく強制的にフィット方式を指定できるようにする */
@@ -291,6 +293,22 @@
   <div id="cameraModal" style="display:none; position:fixed; inset:0; height:100svh; background:#000; z-index:1000; flex-direction:column; overflow-y:auto;">
     <video id="cameraVideo" autoplay playsinline muted style="flex:1 1 auto; min-height:0; width:100%; object-fit:cover; background:#000;"></video>
     <div id="cameraStatus" class="mono" style="position:absolute; top:10px; left:10px; right:10px; display:flex; gap:6px; flex-wrap:wrap; z-index:2;"></div>
+    <div id="camMiniWidgets" style="position:absolute; top:56px; left:10px; display:flex; gap:8px; z-index:2;">
+      <div id="camMiniMapWrap" style="width:72px; height:72px; border-radius:10px; overflow:hidden; border:1px solid rgba(255,255,255,.28); background:rgba(0,0,0,.4); display:none;">
+        <img id="camMiniMap" style="width:100%; height:100%; object-fit:cover; display:block;">
+      </div>
+      <div id="camCompassWrap" style="width:72px; height:72px; border-radius:10px; background:rgba(0,0,0,.5); border:1px solid rgba(255,255,255,.28); display:none;">
+        <svg width="72" height="72" viewBox="0 0 72 72">
+          <circle cx="36" cy="36" r="28" fill="none" stroke="rgba(255,255,255,.3)" stroke-width="1"></circle>
+          <text x="36" y="13" text-anchor="middle" font-size="9" fill="#fff">N</text>
+          <line id="camCompassNeedle" x1="36" y1="36" x2="36" y2="10" stroke="#e88a3c" stroke-width="3" stroke-linecap="round"></line>
+          <circle cx="36" cy="36" r="3" fill="#e88a3c"></circle>
+        </svg>
+      </div>
+    </div>
+    <div id="camGpsWarn" style="display:none; position:absolute; bottom:82px; left:16px; right:16px; background:rgba(186,90,10,.92); border:1px solid rgba(255,255,255,.3); border-radius:8px; padding:10px 12px; font-size:12.5px; color:#fff; text-align:center; z-index:3;">
+      📍 GPSがまだ取得できていません。もう一度シャッターを押すと、GPS無しのまま撮影します
+    </div>
     <div style="flex-shrink:0; background:#0c0e10; padding:10px 16px calc(10px + env(safe-area-inset-bottom, 0px)); display:flex; align-items:center; justify-content:space-between;">
       <button id="btnCameraCancel" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.35); color:#fff; border-radius:20px; padding:8px 14px; font-size:13px; font-family:inherit; flex-shrink:0;">閉じる</button>
       <button id="btnCameraOrient" title="表示の向きが実際と違う場合はタップ" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.35); color:#fff; border-radius:20px; padding:8px 12px; font-size:16px; font-family:inherit; flex-shrink:0; line-height:1;">⤢</button>
@@ -324,6 +342,19 @@
         </div>
         <!-- フェーズ③：確認・保存 -->
         <div id="revFinal" class="rev-phase" style="display:none;">
+          <div id="revDirWrap" style="display:none; align-items:center; gap:12px; background:rgba(255,255,255,.05); border-radius:8px; padding:10px 12px;">
+            <div id="revDirDial" style="width:64px; height:64px; border-radius:50%; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.22); position:relative; touch-action:none; cursor:grab; flex-shrink:0;">
+              <svg width="64" height="64" viewBox="0 0 64 64" style="position:absolute; top:0; left:0; pointer-events:none;">
+                <text x="32" y="11" text-anchor="middle" font-size="8" fill="rgba(255,255,255,.5)">N</text>
+                <line id="revDirNeedle" x1="32" y1="32" x2="32" y2="10" stroke="#ffb347" stroke-width="3" stroke-linecap="round"></line>
+                <circle cx="32" cy="32" r="3" fill="#ffb347"></circle>
+              </svg>
+            </div>
+            <div style="flex:1; min-width:0;">
+              <div style="font-size:10.5px; color:#ffb347; font-weight:700; margin-bottom:2px;">撮影方向（ドラッグで修正できます）</div>
+              <div id="revDirLabel" style="font-size:14px; color:#f2efe9;">-</div>
+            </div>
+          </div>
           <div class="rev-fields" id="revFields">
             <div class="rev-field">
               <label>識別子</label>
@@ -511,6 +542,43 @@
   const cameraStatus = $('cameraStatus');
   const btnCameraCancel = $('btnCameraCancel');
   const btnCameraOrient = $('btnCameraOrient');
+  const camMiniMapWrap = $('camMiniMapWrap');
+  const camMiniMap = $('camMiniMap');
+  const camCompassWrap = $('camCompassWrap');
+  const camCompassNeedle = $('camCompassNeedle');
+  const camGpsWarn = $('camGpsWarn');
+  const STATIC_MAP_API_KEY = 'AIzaSyCxFFQxa-0PtBYfJ9gXWkur2wiszMwk7S0';
+  let lastMapGeo = null; // 最後に静止画地図を更新した位置（一定距離動くまでは再取得しない）
+  let gpsWarnShown = false; // GPS未取得のままシャッターを押した時、一度警告を出したかどうか
+
+  // 2点間の距離をメートルで概算する（地図更新の要否判定に使用）
+  function distMeters(a, b){
+    const R = 6371000;
+    const dLat = (b.lat - a.lat) * Math.PI / 180;
+    const dLng = (b.lng - a.lng) * Math.PI / 180;
+    const s = Math.sin(dLat/2)**2 + Math.cos(a.lat*Math.PI/180) * Math.cos(b.lat*Math.PI/180) * Math.sin(dLng/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1-s));
+  }
+
+  // 現在地の静止画地図を更新する（Static Maps API。通信・課金対策として25m未満の移動では更新しない）
+  function updateMiniMap(geo){
+    if (!geo) return;
+    camMiniMapWrap.style.display = 'block';
+    if (lastMapGeo && distMeters(lastMapGeo, geo) < 25) return;
+    lastMapGeo = { lat: geo.lat, lng: geo.lng };
+    camMiniMap.src = `https://maps.googleapis.com/maps/api/staticmap?center=${geo.lat},${geo.lng}&zoom=17&size=144x144&scale=1&maptype=roadmap&markers=color:red%7C${geo.lat},${geo.lng}&key=${STATIC_MAP_API_KEY}`;
+  }
+
+  // コンパスの針をリアルタイムに更新する
+  function updateCompassNeedle(deg){
+    if (deg === null || deg === undefined) return;
+    camCompassWrap.style.display = 'block';
+    const rad = (deg - 90) * Math.PI / 180;
+    const x2 = 36 + 24 * Math.cos(rad);
+    const y2 = 36 + 24 * Math.sin(rad);
+    camCompassNeedle.setAttribute('x2', x2);
+    camCompassNeedle.setAttribute('y2', y2);
+  }
   const btnCameraShutter = $('btnCameraShutter');
   const captureCanvas = $('captureCanvas');
 
@@ -777,6 +845,8 @@
   async function openCamera(){
     latestGeo = null; latestHeading = null; headingBuffer = [];
     cameraModal.classList.remove('force-landscape','force-portrait'); // 毎回、自動判定からやり直す
+    lastMapGeo = null; gpsWarnShown = false;
+    camMiniMapWrap.style.display = 'none'; camCompassWrap.style.display = 'none'; camGpsWarn.style.display = 'none';
 
     sizeCameraModal();
     if (window.visualViewport) window.visualViewport.addEventListener('resize', onViewportResize);
@@ -786,14 +856,19 @@
     // 位置情報の継続監視を開始
     if (navigator.geolocation) {
       geoWatchId = navigator.geolocation.watchPosition(
-        (pos) => { latestGeo = { lat: pos.coords.latitude, lng: pos.coords.longitude, alt: pos.coords.altitude }; updateCameraStatus(); },
+        (pos) => {
+          latestGeo = { lat: pos.coords.latitude, lng: pos.coords.longitude, alt: pos.coords.altitude };
+          gpsWarnShown = false; camGpsWarn.style.display = 'none'; // GPSが取れたら警告は不要
+          updateMiniMap(latestGeo);
+          updateCameraStatus();
+        },
         () => { updateCameraStatus(); },
         { enableHighAccuracy: true, maximumAge: 2000 }
       );
     }
 
     // 方位センサーの許可・監視を開始（iOS13+は明示的な許可が必要）
-    orientationHandler = (e) => { const h = getCompassHeading(e); if (h !== null) { latestHeading = h; pushHeadingSample(h); updateCameraStatus(); } };
+    orientationHandler = (e) => { const h = getCompassHeading(e); if (h !== null) { latestHeading = h; pushHeadingSample(h); updateCompassNeedle(h); updateCameraStatus(); } };
     try {
       if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
         const perm = await DeviceOrientationEvent.requestPermission();
@@ -855,6 +930,11 @@
   });
 
   btnCameraShutter.addEventListener('click', () => {
+    if (!latestGeo && !gpsWarnShown) {
+      gpsWarnShown = true;
+      camGpsWarn.style.display = 'block';
+      return;
+    }
     const w = cameraVideo.videoWidth, h = cameraVideo.videoHeight;
     if (!w || !h) return;
     captureCanvas.width = w; captureCanvas.height = h;
@@ -881,6 +961,7 @@
         pendingPhoto.alt = exif.alt; pendingPhoto.dir = exif.dir;
         pendingPhoto.geoSource = 'exif';
         renderGeoBadges(pendingPhoto, reviewGeoBadges);
+        initDirDial();
         return;
       }
     } catch(err){}
@@ -920,9 +1001,48 @@
     reviewImg.src = pendingPhoto.url;
     renderGeoBadges(pendingPhoto, reviewGeoBadges);
     revStatusNote.style.display = 'none';
+    initDirDial();
     showRevPhase('choice');
     reviewModal.style.display = 'block';
   }
+
+  // ── 方向ダイヤル：撮影直後の確認画面で、ドラッグして方向を手動修正できるようにする ──
+  const revDirWrap = $('revDirWrap');
+  const revDirDial = $('revDirDial');
+  const revDirNeedle = $('revDirNeedle');
+  const revDirLabel = $('revDirLabel');
+
+  function initDirDial(){
+    if (pendingPhoto && pendingPhoto.dir !== null && pendingPhoto.dir !== undefined) {
+      revDirWrap.style.display = 'flex';
+      setDirDialAngle(pendingPhoto.dir);
+    } else {
+      revDirWrap.style.display = 'none';
+    }
+  }
+
+  function setDirDialAngle(deg){
+    deg = (deg + 360) % 360;
+    if (pendingPhoto) { pendingPhoto.dir = deg; renderGeoBadges(pendingPhoto, reviewGeoBadges); }
+    const rad = (deg - 90) * Math.PI / 180;
+    revDirNeedle.setAttribute('x2', 32 + 22 * Math.cos(rad));
+    revDirNeedle.setAttribute('y2', 32 + 22 * Math.sin(rad));
+    revDirLabel.textContent = `${Math.round(deg)}°（${dirName(deg)}）`;
+  }
+
+  (function setupDirDialDrag(){
+    let dragging = false;
+    function angleFromEvent(e){
+      const rect = revDirDial.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
+      const px = (e.touches ? e.touches[0].clientX : e.clientX) - cx;
+      const py = (e.touches ? e.touches[0].clientY : e.clientY) - cy;
+      return Math.atan2(py, px) * 180 / Math.PI + 90;
+    }
+    revDirDial.addEventListener('pointerdown', (e) => { dragging = true; revDirDial.style.cursor = 'grabbing'; setDirDialAngle(angleFromEvent(e)); });
+    window.addEventListener('pointermove', (e) => { if (!dragging) return; e.preventDefault(); setDirDialAngle(angleFromEvent(e)); });
+    window.addEventListener('pointerup', () => { dragging = false; revDirDial.style.cursor = 'grab'; });
+  })();
 
   reviewBtnClose.addEventListener('click', () => {
     if (!confirm('撮影した写真を破棄します。よろしいですか？')) return;
