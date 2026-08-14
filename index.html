@@ -774,6 +774,15 @@
   let latestHeading = null; // number|null（表示用：直近の生値）
   let headingBuffer = []; // 直近サンプルを溜めて円環平均を取る（磁気ノイズ・瞬間的な乱れを緩和するため）
   let orientationHandler = null;
+  let orientationSensor = null; // AbsoluteOrientationSensor（対応環境で使用）
+
+  // AbsoluteOrientationSensorのクォータニオン(x,y,z,w)から、コンパス方位角(0=北、時計回り)を求める
+  function quaternionToHeading(q){
+    if (!q || q.length < 4) return null;
+    const [x, y, z, w] = q;
+    const yaw = Math.atan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z)) * 180 / Math.PI;
+    return (360 - yaw + 360) % 360;
+  }
 
   function getCompassHeading(event){
     if (event.webkitCompassHeading !== undefined && event.webkitCompassHeading !== null) {
@@ -867,17 +876,42 @@
       );
     }
 
-    // 方位センサーの許可・監視を開始（iOS13+は明示的な許可が必要）
+    // 方位センサーの許可・監視を開始
     orientationHandler = (e) => { const h = getCompassHeading(e); if (h !== null) { latestHeading = h; pushHeadingSample(h); updateCompassNeedle(h); updateCameraStatus(); } };
-    try {
-      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-        const perm = await DeviceOrientationEvent.requestPermission();
-        if (perm === 'granted') window.addEventListener('deviceorientation', orientationHandler);
-      } else {
-        window.addEventListener('deviceorientationabsolute', orientationHandler);
-        window.addEventListener('deviceorientation', orientationHandler);
-      }
-    } catch(e) { /* 方位センサー利用不可、GPSのみで続行 */ }
+    let usedFusionSensor = false;
+    // ① 最優先：AbsoluteOrientationSensor（磁力・ジャイロ・加速度をOS側で融合済みの高精度データ。
+    //    Android Chrome等が対応。画面の回転補正も自動で行われる）
+    if (typeof AbsoluteOrientationSensor !== 'undefined') {
+      try {
+        const perms = await Promise.all(
+          ['accelerometer', 'gyroscope', 'magnetometer'].map(name =>
+            navigator.permissions.query({ name }).catch(() => ({ state: 'granted' }))
+          )
+        );
+        if (!perms.some(p => p.state === 'denied')) {
+          orientationSensor = new AbsoluteOrientationSensor({ frequency: 30, referenceFrame: 'screen' });
+          orientationSensor.addEventListener('reading', () => {
+            const h = quaternionToHeading(orientationSensor.quaternion);
+            if (h !== null) { latestHeading = h; pushHeadingSample(h); updateCompassNeedle(h); updateCameraStatus(); }
+          });
+          orientationSensor.addEventListener('error', () => { /* 起動できなければ、下のフォールバックに任せる */ });
+          orientationSensor.start();
+          usedFusionSensor = true;
+        }
+      } catch(e) { /* 非対応・権限拒否等。フォールバックへ */ }
+    }
+    // ② フォールバック：従来のDeviceOrientationEvent（iOS Safari等、①が使えない環境向け）
+    if (!usedFusionSensor) {
+      try {
+        if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+          const perm = await DeviceOrientationEvent.requestPermission();
+          if (perm === 'granted') window.addEventListener('deviceorientation', orientationHandler);
+        } else {
+          window.addEventListener('deviceorientationabsolute', orientationHandler);
+          window.addEventListener('deviceorientation', orientationHandler);
+        }
+      } catch(e) { /* 方位センサー利用不可、GPSのみで続行 */ }
+    }
 
     updateCameraStatus();
 
@@ -903,6 +937,10 @@
       window.removeEventListener('deviceorientation', orientationHandler);
       window.removeEventListener('deviceorientationabsolute', orientationHandler);
       orientationHandler = null;
+    }
+    if (orientationSensor) {
+      try { orientationSensor.stop(); } catch(e) {}
+      orientationSensor = null;
     }
   }
 
